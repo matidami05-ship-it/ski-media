@@ -35,7 +35,8 @@ const Ski={
         await new Promise(r=>setTimeout(r,2000))}
       if(info.status!=="downloaded")throw new Error("Not ready yet. Try another source.");
       const u=await Ski.rd.call(tok,"/unrestrict/link",{method:"POST",headers:F,body:"link="+encodeURIComponent(info.links[0])});
-      return u.download}
+      return{url:u.download,id:u.id}},
+    async transcode(tok,id){try{const r=await Ski.rd.call(tok,"/streaming/transcode/"+id);const pick=o=>o&&(o.full||Object.values(o)[0]);return pick(r.apple)||pick(r.liveMP4)||pick(r.h264WebM)||""}catch(e){return""}}
   }
 };
 
