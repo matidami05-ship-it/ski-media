@@ -1,0 +1,8 @@
+{
+  "appId": "com.skimedia.app",
+  "appName": "Ski Media",
+  "webDir": "www",
+  "server": { "androidScheme": "https", "cleartext": true },
+  "android": { "allowMixedContent": true },
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}
