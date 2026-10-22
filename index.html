@@ -206,7 +206,7 @@ tt0056923:{r:7.9,rt:113,gen:["Comedy","Mystery","Romance"],dir:"Stanley Donen",c
 const TM={};
 async function loadTmdb(i){const id=CAT[i].id;if(!S.tmdb.on||TM[id]||loadTmdb.p===id||isLive(CAT[i])||(!CAT[i].tid&&CAT[i].aid&&!/^tt\d+$/.test(CAT[i].aid)))return;loadTmdb.p=id;
 try{const k=encodeURIComponent(S.tmdb.key),b="https://api.themoviedb.org/3",im="https://image.tmdb.org/t/p/",x=META[id];
-let kind="movie",tid=CAT[i].tid;if(tid){kind=isTv(CAT[i])?"tv":"movie"}else{const f=await(await fetch(`${b}/find/${id}?external_source=imdb_id&api_key=${k}`)).json();const mv=f.movie_results&&f.movie_results[0];if(!mv)throw 0;tid=mv.id}
+let kind="movie",tid=CAT[i].tid;if(tid){kind=isTv(CAT[i])?"tv":"movie"}else{const f=await(await fetch(`${b}/find/${id}?external_source=imdb_id&api_key=${k}`)).json();const tvr=isTv(CAT[i])&&f.tv_results&&f.tv_results[0],mv=tvr||(f.movie_results&&f.movie_results[0]);if(!mv)throw 0;tid=mv.id;if(tvr)kind="tv"}
 const d=await(await fetch(`${b}/${kind}/${tid}?append_to_response=credits,external_ids,content_ratings,release_dates,videos,recommendations&api_key=${k}`)).json();
 const cr=d.credits||{};
 TM[id]={ov:d.overview,r:d.vote_average||x.r,rt:d.runtime||(d.episode_run_time||[])[0]||x.rt,gen:(d.genres||[]).map(g=>g.name),dir:((cr.crew||[]).find(p=>p.job==="Director")||{}).name||((d.created_by||[])[0]||{}).name||x.dir,cast:(cr.cast||[]).slice(0,14).map(p=>({n:p.name,ch:p.character||"",img:p.profile_path?im+"w185"+p.profile_path:""})),
@@ -488,11 +488,18 @@ return `<h2>Watchlist</h2>${wl.length?`<div class="row">${wl.map(i=>card(i)).joi
 const MT={};
 function parseRuntime(r){const n=parseInt(String(r||"").replace(/\D+/g," ").trim());return n||0}
 function fmtDate(s){if(!s)return"";const d=new Date(s);if(isNaN(d))return"";return d.getUTCDate()+" "+d.toLocaleString("en",{month:"short",timeZone:"UTC"})+", "+d.getUTCFullYear()}
-async function fetchMeta(m){const id=m.aid||m.id;if(!/^tt\d+$/.test(id))return null;if(id in MT)return MT[id];
-const type=isTv(m)?"series":"movie",bases=S.addons.filter(a=>a.res.includes("meta")).map(a=>a.url).concat(["https://v3-cinemeta.strem.io"]);
+async function tmdbEps(m){if(!S.tmdb.on)return[];const k=encodeURIComponent(S.tmdb.key),b="https://api.themoviedb.org/3",id=m.aid||m.id;
+try{let tid=m.tid;if(!tid&&/^tt\d+$/.test(id)){const f=await(await fetch(`${b}/find/${id}?external_source=imdb_id&api_key=${k}`)).json();tid=((f.tv_results||[])[0]||{}).id}
+if(!tid)return[];const d=await(await fetch(`${b}/tv/${tid}?api_key=${k}`)).json();
+const sn=(d.seasons||[]).map(x=>x.season_number).filter(n=>n>0);
+const all=await Promise.all(sn.map(n=>fetch(`${b}/tv/${tid}/season/${n}?api_key=${k}`).then(r=>r.json()).catch(()=>({}))));
+const out=[];all.forEach(z=>(z.episodes||[]).forEach(e=>{if(e.season_number>0&&e.episode_number>0)out.push({season:e.season_number,episode:e.episode_number,title:e.name,released:e.air_date,overview:e.overview,thumbnail:e.still_path?"https://image.tmdb.org/t/p/w300"+e.still_path:""})}));return out}catch(e){return[]}}
+async function fetchMeta(m){const id=m.aid||m.id,tt=/^tt\d+$/.test(id),tv=isTv(m);if(!tt&&!(tv&&m.tid))return null;if(id in MT)return MT[id];
+let best=null;
+if(tt){const type=tv?"series":"movie",bases=S.addons.filter(a=>a.res.includes("meta")).map(a=>a.url).concat(["https://v3-cinemeta.strem.io"]);
 for(const b of bases){try{const r=await Ski.j(b+"/meta/"+type+"/"+encodeURIComponent(id)+".json");
-if(r&&r.meta&&(r.meta.name||r.meta.videos)){MT[id]=r.meta;MC[id]=(r.meta.videos||[]).filter(x=>x.season>0&&x.episode>0);return MT[id]}}catch(e){}}
-MT[id]=null;if(!MC[id])MC[id]=[];return null}
+if(r&&r.meta&&(r.meta.name||r.meta.videos)){const v=(r.meta.videos||[]).filter(x=>x.season>0&&x.episode>0);if(!best)best=r.meta;if(!tv||v.length){MT[id]=r.meta;MC[id]=v;return MT[id]}}}catch(e){}}}
+MT[id]=best;if(tv){const v=await tmdbEps(m);if(v.length)MC[id]=v}if(!MC[id])MC[id]=[];return best}
 function dInfo(i){const m=CAT[i],id=m.aid||m.id,t=tm(i)||{},mt=MT[id]||{},x=META[m.id]||{gen:[],cast:[],rt:0,r:0};
 const tc=(t.cast||[]).map(p=>p.n),yr=m.y||String(mt.releaseInfo||mt.year||"").slice(0,4);
 return{bg:t.bd||mt.background||m.poster||"",logo:mt.logo||"",genres:(t.gen&&t.gen.length?t.gen:(mt.genres||x.gen||[])),year:yr,
@@ -502,7 +509,7 @@ function initEp(i){if(EP.i===i)return;const m=CAT[i];if(!isTv(m)){EP={i,s:1,e:1}
 if(L)EP={i,s:L.s,e:L.e};else if(l.length)EP={i,s:l[0].season,e:l[0].episode};else EP={i,s:1,e:1}}
 const CK='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
 function episodesHtml(i){const m=CAT[i],id=m.aid||m.id,l=epList(i);
-if(!l.length){if(!(id in MT)&&/^tt\d+$/.test(id))return'<h2>Episodes</h2><p class="meta">Loading episodes...</p>';
+if(!l.length){if(!(id in MT)&&(/^tt\d+$/.test(id)||(isTv(m)&&m.tid&&S.tmdb.on)))return'<h2>Episodes</h2><p class="meta">Loading episodes...</p>';
 return'<h2>Episodes</h2><p class="meta">No episode list found. Enter the episode to play.</p><div style="display:flex;gap:8px"><input id="sn" type="number" min="1" value="'+EP.s+'" aria-label="Season"><input id="en" type="number" min="1" value="'+EP.e+'" aria-label="Episode"></div>'}
 const ss=[...new Set(l.map(x=>x.season))].sort((a,b)=>a-b),vs=ss.includes(EP.vs)?EP.vs:(ss.includes(EP.s)?EP.s:ss[0]);
 return'<select class="seasel" id="sv" aria-label="Season">'+ss.map(n=>'<option value="'+n+'"'+(n===vs?" selected":"")+'>Season '+n+'</option>').join("")+'</select><div class="eps">'
@@ -512,7 +519,7 @@ let SL={k:"",p:null};
 function loadStreams(){const k=view+"|"+EP.s+"|"+EP.e;if(SL.p&&SL.k===k)return SL.p;SL.k=k;const p=_loadStreams();SL.p=p;p.finally(()=>{if(SL.p===p)SL.p=null});return p}
 async function loadDetail(){const i=view;if(i===null)return;const m=CAT[i],id=m.aid||m.id;
 if(isTv(m)&&!/^tt\d+$/.test(id)&&S.tmdb.on)loadTmdb(i);
-if(/^tt\d+$/.test(id)&&!(id in MT)){await fetchMeta(m);if(view!==i)return;
+if((/^tt\d+$/.test(id)||(isTv(m)&&m.tid&&S.tmdb.on))&&!(id in MT)){await fetchMeta(m);if(view!==i)return;
 if(isTv(m)&&!S.last[m.id]&&EP.i===i){const l=epList(i);if(l.length){EP.s=l[0].season;EP.e=l[0].episode}}
 const pl=$("#pl");if(!pl||pl.hidden)render();return}
 if(S.addons.length)loadStreams()}
