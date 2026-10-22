@@ -2,6 +2,8 @@ name: Build Android APK
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,6 +20,11 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Use the app's fixed signing key
+        # Same key every build, so new APKs install over the old one.
+        run: |
+          mkdir -p ~/.android
+          cp ci/debug.keystore ~/.android/debug.keystore
       - name: Build
         run: |
           npm install
@@ -102,9 +109,21 @@ jobs:
           JAVA
           npx cap sync android
           cd android
+          sed -i "s/versionCode 1$/versionCode ${GITHUB_RUN_NUMBER}/; s/versionName \"1.0\"/versionName \"1.0.${GITHUB_RUN_NUMBER}\"/" app/build.gradle
           chmod +x gradlew
           ./gradlew assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: ski-media-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Rename APK
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk SkiMedia.apk
+      - name: Publish download
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Ski Media (build ${{ github.run_number }})
+          body: Download **SkiMedia.apk** on your Android phone and open it to install. Updates install over the previous build.
+          files: SkiMedia.apk
+          make_latest: true
