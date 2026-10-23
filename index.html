@@ -326,13 +326,13 @@ const SRC=[
 {n:"Community Addon · 4K",q:"2160p",s:"Debrid cached",k:"cached"},
 {n:"Community Addon · 720p",q:"720p",s:"Needs debrid account",k:"lock"}
 ];
-const PROVIDERS=["Real-Debrid"];
+const PROVIDERS=["Real-Debrid","AllDebrid","Premiumize","TorBox","Debrid-Link"];
 
 let S;
 try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
 S.tmdb=S.tmdb||{on:false,key:""};S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
-S.debrids=(S.debrids||(S.debrid&&S.debrid.on?[{prov:S.debrid.prov,token:S.debrid.token}]:[])).filter(d=>d&&/real/i.test(d.prov));
+S.debrids=S.debrids||(S.debrid&&S.debrid.on?[{prov:S.debrid.prov,token:S.debrid.token}]:[]);
 S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
 let view=null;
@@ -732,11 +732,11 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 
 function settings(){
 return `<h2>Settings</h2><div class="panel"><h3>Debrid accounts</h3><span class="status ${S.debrids.length?'on':''}">${S.debrids.length?S.debrids.length+' linked':'Not linked'}</span>
-<p>Real-Debrid turns torrent sources into instant streams and powers your Debrid cloud. Other services are not supported yet.</p>
+<p>Link as many services as you like. Real-Debrid is the only one that plays streams and powers Debrid cloud right now; the others are saved for later.</p>
 ${S.debrids.map((d,n)=>`<div class="src"><div><b>${esc(d.prov)}</b><small>${n===0?'Primary':'Backup'}</small></div>${n?`<button class="btn alt" style="margin:0;padding:8px 12px" data-top="${n}">Make primary</button>`:''}<button class="btn alt" style="margin:0;padding:8px 12px" data-rmdeb="${n}">Remove</button></div>`).join("")}
-${(f=>f.length?`<label for="dp">Service</label><select id="dp">${f.map(p=>`<option>${p}</option>`).join("")}</select>
+${(f=>f.length?`<label for="dp">Add a service</label><select id="dp">${f.map(p=>`<option>${p}</option>`).join("")}</select>
 <label for="dt">API token</label><input id="dt" type="password" autocomplete="off" placeholder="Paste your API token">
-<button class="btn" data-link="debrid">Link account</button>`:'<p class="meta">Real-Debrid is linked.</p>')(PROVIDERS.filter(p=>!S.debrids.some(d=>d.prov===p)))}</div>
+<button class="btn" data-link="debrid">Link account</button>`:'<p class="meta">All supported services are linked.</p>')(PROVIDERS.filter(p=>!S.debrids.some(d=>d.prov===p)))}</div>
 <div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
 <div class="panel"><h3>TV mode</h3><p>Layout for Android TV and other remote-control screens. Auto turns it on when there is no touchscreen.</p><label for="tvm">TV mode</label><select id="tvm"><option value="auto" ${(S.tvmode||"auto")==="auto"?"selected":""}>Auto</option><option value="on" ${S.tvmode==="on"?"selected":""}>On</option><option value="off" ${S.tvmode==="off"?"selected":""}>Off</option></select></div>
 <div class="panel"><h3>TMDB</h3><span class="status ${S.tmdb.on?'on':''}">${S.tmdb.on?'Linked':'Not linked'}</span>
