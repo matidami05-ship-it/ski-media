@@ -1090,7 +1090,10 @@ jobs:
               private TextView posText, durText, clockText;
               private ProgressBar spinner;
               private TextView speedBtn, fitBtn;
-              private boolean ended = false, wantNext = false, dragging = false, zoom = false;
+              private String wantEp = null;
+          private JSONArray episodes = null;
+          private int curS = 0, curE = 0;
+          private boolean ended = false, wantNext = false, dragging = false, zoom = false;
               private String error = null;
               private final Handler handler = new Handler(Looper.getMainLooper());
               private final float[] speeds = {1f, 1.25f, 1.5f, 2f, 0.75f};
@@ -1180,6 +1183,13 @@ jobs:
                   String sub = getIntent().getStringExtra("sub");
                   String badgesJson = getIntent().getStringExtra("badges");
                   boolean hasNext = getIntent().getBooleanExtra("hasNext", false);
+          curS = getIntent().getIntExtra("curS", 0);
+          curE = getIntent().getIntExtra("curE", 0);
+          try {
+              String ej = getIntent().getStringExtra("episodes");
+              if (ej != null && !ej.isEmpty()) episodes = new JSONArray(ej);
+          } catch (Exception ignored) {
+          }
                   long startPos = getIntent().getLongExtra("pos", 0L);
                   String subsJson = getIntent().getStringExtra("subs");
 
@@ -1343,6 +1353,11 @@ jobs:
                   });
                   actions.addView(subsBtn);
                   actions.addView(audioBtn);
+          if (episodes != null && episodes.length() > 1) {
+              TextView epBtn = action("\u2630  Episodes");
+              epBtn.setOnClickListener(v -> pickEpisode());
+              actions.addView(epBtn);
+          }
                   actions.addView(speedBtn);
                   actions.addView(fitBtn);
                   bottom.addView(actions, new LinearLayout.LayoutParams(
@@ -1503,6 +1518,37 @@ jobs:
                   return sb.toString();
               }
 
+              private void pickEpisode() {
+                  if (episodes == null) return;
+                  final int n = episodes.length();
+                  final String[] names = new String[n];
+                  int checked = 0;
+                  for (int i = 0; i < n; i++) {
+                      JSONObject o = episodes.optJSONObject(i);
+                      if (o == null) continue;
+                      int s = o.optInt("s"), e = o.optInt("e");
+                      String t = o.optString("t", "");
+                      names[i] = "S" + s + ":E" + e + (t.isEmpty() ? "" : " - " + t);
+                      if (s == curS && e == curE) checked = i;
+                  }
+                  handler.removeCallbacks(hideRun);
+                  AlertDialog dlg = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                      .setTitle("Episodes")
+                      .setSingleChoiceItems(names, checked, (dialog, which) -> {
+                          JSONObject o = episodes.optJSONObject(which);
+                          dialog.dismiss();
+                          if (o != null && !(o.optInt("s") == curS && o.optInt("e") == curE)) {
+                              wantEp = o.optInt("s") + ":" + o.optInt("e");
+                              finish();
+                          } else scheduleHide();
+                      })
+                      .setOnCancelListener(d -> scheduleHide())
+                      .create();
+                  dlg.show();
+                  final int sel = checked;
+                  dlg.getListView().post(() -> dlg.getListView().setSelection(Math.max(0, sel - 2)));
+              }
+          
               private void pickTrack(final int type, String title) {
                   if (player == null) return;
                   final List<Tracks.Group> groups = new ArrayList<>();
@@ -1608,6 +1654,7 @@ jobs:
                   }
                   r.putExtra("ended", ended);
                   r.putExtra("next", wantNext);
+          if (wantEp != null) r.putExtra("ep", wantEp);
                   if (error != null) r.putExtra("error", error);
                   setResult(RESULT_OK, r);
                   super.finish();
@@ -1658,6 +1705,10 @@ jobs:
                   Double pos = call.getDouble("pos", 0.0);
                   intent.putExtra("pos", pos == null ? 0L : (long) pos.doubleValue());
                   intent.putExtra("sub", call.getString("sub", ""));
+          JSArray eps = call.getArray("episodes");
+          if (eps != null) intent.putExtra("episodes", eps.toString());
+          intent.putExtra("curS", call.getInt("s", 0));
+          intent.putExtra("curE", call.getInt("e", 0));
                   JSArray badges = call.getArray("badges");
                   if (badges != null) intent.putExtra("badges", badges.toString());
                   Boolean hn = call.getBoolean("next", false);
@@ -1677,6 +1728,8 @@ jobs:
                       ret.put("duration", data.getLongExtra("duration", 0L));
                       ret.put("ended", data.getBooleanExtra("ended", false));
                       ret.put("next", data.getBooleanExtra("next", false));
+          String epx = data.getStringExtra("ep");
+          if (epx != null) ret.put("ep", epx);
                       String err = data.getStringExtra("error");
                       if (err != null) ret.put("error", err);
                   }

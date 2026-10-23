@@ -534,8 +534,9 @@ const onRes=res=>{if(res&&res.duration>0)savePos(vi,cur.s,cur.e,res.position/100
 if(useSki()){let subs=[];try{subs=await Promise.race([fetchSubs(vi,cur),new Promise(x=>setTimeout(()=>x([]),3500))])}catch(e){}
 if(view!==vi&&view!==null){}
 try{if(view===vi&&p)p.textContent="Starting the player...";const si=streamInfo(r.s),nx=tv?nextEp(vi,cur):null,bd=[si.q,si.size,String(r.prov||"").toLowerCase()].filter(Boolean);
-const res=await skiP().play({url:r.url,title:m.t,sub:epLine(vi,cur),badges:bd,next:!!nx,pos:pos*1000,subs:subs.slice(0,10).map(x=>({url:x.url,lang:x.lang}))});
+const res=await skiP().play({url:r.url,title:m.t,sub:epLine(vi,cur),badges:bd,next:!!nx,s:cur.s,e:cur.e,episodes:tv?epList(vi).slice(0,400).map(x=>({s:x.season,e:x.episode,t:x.title||x.name||""})):[],pos:pos*1000,subs:subs.slice(0,10).map(x=>({url:x.url,lang:x.lang}))});
 if(res&&res.next&&nx){onRes(res);playEpisode(vi,nx.s,nx.e);return}
+if(res&&res.ep){const q=res.ep.split(":");onRes(res);playEpisode(vi,+q[0],+q[1]);return}
 if(res&&res.error){toast("Ski Player couldn't play this ("+String(res.error).replace(/^ERROR_CODE_/,"").toLowerCase().replace(/_/g," ")+"). Trying VLC.")}else{onRes(res);return}}catch(e){toast("Ski Player isn't in this build yet. Trying VLC.")}}
 if(useVlc()){try{const pr=openVlc(r.url,label,pos*1000).then(onRes);await Promise.race([pr,new Promise(x=>setTimeout(x,700))]);pr.catch(()=>{});if(view===vi)launchedUI(p,r,vi);return}catch(e){const mm=String(e&&e.message||e);toast(/not installed/i.test(mm)?"VLC isn't installed. Get it from Google Play. Using the web player for now.":/not implemented|not available/i.test(mm)?"This app build has no VLC support yet. Using the web player.":"Couldn't open VLC ("+mm.slice(0,60)+"). Using the web player.")}}
 if(view===vi)mountPlayer(p,{orig:r.url,tc:r.tc||"",info:streamInfo(r.s),prov:r.prov},vi)}
