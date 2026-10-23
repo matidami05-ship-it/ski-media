@@ -326,13 +326,13 @@ const SRC=[
 {n:"Community Addon · 4K",q:"2160p",s:"Debrid cached",k:"cached"},
 {n:"Community Addon · 720p",q:"720p",s:"Needs debrid account",k:"lock"}
 ];
-const PROVIDERS=["Real-Debrid","AllDebrid","Premiumize","TorBox","Debrid-Link"];
+const PROVIDERS=["Real-Debrid"];
 
 let S;
 try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
 S.tmdb=S.tmdb||{on:false,key:""};S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
-S.debrids=S.debrids||(S.debrid&&S.debrid.on?[{prov:S.debrid.prov,token:S.debrid.token}]:[]);
+S.debrids=(S.debrids||(S.debrid&&S.debrid.on?[{prov:S.debrid.prov,token:S.debrid.token}]:[])).filter(d=>d&&/real/i.test(d.prov));
 S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
 let view=null;
@@ -529,7 +529,9 @@ S.progress[vi]=Math.max(S.progress[vi]||0,.05);if(tv)S.last[m.id]={s:cur.s,e:cur
 const onRes=res=>{if(res&&res.duration>0)savePos(vi,cur.s,cur.e,res.position/1000,res.duration/1000,res.ended);if(view===vi)render()};
 if(useSki()){let subs=[];try{subs=await Promise.race([fetchSubs(vi,cur),new Promise(x=>setTimeout(()=>x([]),3500))])}catch(e){}
 if(view!==vi&&view!==null){}
-try{if(view===vi&&p)p.textContent="Starting the player...";const res=await skiP().play({url:r.url,title:label,pos:pos*1000,subs:subs.slice(0,10).map(x=>({url:x.url,lang:x.lang}))});
+try{if(view===vi&&p)p.textContent="Starting the player...";const si=streamInfo(r.s),nx=tv?nextEp(vi,cur):null,bd=[si.q,si.size,String(r.prov||"").toLowerCase()].filter(Boolean);
+const res=await skiP().play({url:r.url,title:m.t,sub:epLine(vi,cur),badges:bd,next:!!nx,pos:pos*1000,subs:subs.slice(0,10).map(x=>({url:x.url,lang:x.lang}))});
+if(res&&res.next&&nx){onRes(res);playEpisode(vi,nx.s,nx.e);return}
 if(res&&res.error){toast("Ski Player couldn't play this ("+String(res.error).replace(/^ERROR_CODE_/,"").toLowerCase().replace(/_/g," ")+"). Trying VLC.")}else{onRes(res);return}}catch(e){toast("Ski Player isn't in this build yet. Trying VLC.")}}
 if(useVlc()){try{const pr=openVlc(r.url,label,pos*1000).then(onRes);await Promise.race([pr,new Promise(x=>setTimeout(x,700))]);pr.catch(()=>{});if(view===vi)launchedUI(p,r,vi);return}catch(e){const mm=String(e&&e.message||e);toast(/not installed/i.test(mm)?"VLC isn't installed. Get it from Google Play. Using the web player for now.":/not implemented|not available/i.test(mm)?"This app build has no VLC support yet. Using the web player.":"Couldn't open VLC ("+mm.slice(0,60)+"). Using the web player.")}}
 if(view===vi)mountPlayer(p,{orig:r.url,tc:r.tc||"",info:streamInfo(r.s),prov:r.prov},vi)}
@@ -730,11 +732,11 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 
 function settings(){
 return `<h2>Settings</h2><div class="panel"><h3>Debrid accounts</h3><span class="status ${S.debrids.length?'on':''}">${S.debrids.length?S.debrids.length+' linked':'Not linked'}</span>
-<p>Link as many services as you like. Sources use them in the order shown.</p>
+<p>Real-Debrid turns torrent sources into instant streams and powers your Debrid cloud. Other services are not supported yet.</p>
 ${S.debrids.map((d,n)=>`<div class="src"><div><b>${esc(d.prov)}</b><small>${n===0?'Primary':'Backup'}</small></div>${n?`<button class="btn alt" style="margin:0;padding:8px 12px" data-top="${n}">Make primary</button>`:''}<button class="btn alt" style="margin:0;padding:8px 12px" data-rmdeb="${n}">Remove</button></div>`).join("")}
-${(f=>f.length?`<label for="dp">Add a service</label><select id="dp">${f.map(p=>`<option>${p}</option>`).join("")}</select>
+${(f=>f.length?`<label for="dp">Service</label><select id="dp">${f.map(p=>`<option>${p}</option>`).join("")}</select>
 <label for="dt">API token</label><input id="dt" type="password" autocomplete="off" placeholder="Paste your API token">
-<button class="btn" data-link="debrid">Link account</button>`:'<p class="meta">All supported services are linked.</p>')(PROVIDERS.filter(p=>!S.debrids.some(d=>d.prov===p)))}</div>
+<button class="btn" data-link="debrid">Link account</button>`:'<p class="meta">Real-Debrid is linked.</p>')(PROVIDERS.filter(p=>!S.debrids.some(d=>d.prov===p)))}</div>
 <div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
 <div class="panel"><h3>TV mode</h3><p>Layout for Android TV and other remote-control screens. Auto turns it on when there is no touchscreen.</p><label for="tvm">TV mode</label><select id="tvm"><option value="auto" ${(S.tvmode||"auto")==="auto"?"selected":""}>Auto</option><option value="on" ${S.tvmode==="on"?"selected":""}>On</option><option value="off" ${S.tvmode==="off"?"selected":""}>Off</option></select></div>
 <div class="panel"><h3>TMDB</h3><span class="status ${S.tmdb.on?'on':''}">${S.tmdb.on?'Linked':'Not linked'}</span>

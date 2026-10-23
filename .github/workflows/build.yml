@@ -948,37 +948,226 @@ jobs:
               }
           }
           JAVA
+          cat > $JAVA_DIR/SkiIconView.java <<'JAVA'
+          package com.skimedia.app;
+
+          import android.content.Context;
+          import android.graphics.Canvas;
+          import android.graphics.Color;
+          import android.graphics.Paint;
+          import android.graphics.Path;
+          import android.view.View;
+
+          public class SkiIconView extends View {
+              public static final int BACK = 0, REW = 1, FF = 2, PLAY = 3, PAUSE = 4, NEXT = 5;
+              private int type;
+              private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+              public SkiIconView(Context c, int type) {
+                  super(c);
+                  this.type = type;
+                  p.setColor(Color.WHITE);
+              }
+
+              public void setType(int t) {
+                  type = t;
+                  invalidate();
+              }
+
+              private void tri(Canvas c, float x, float cy, float size, boolean left) {
+                  Path path = new Path();
+                  if (left) {
+                      path.moveTo(x, cy - size);
+                      path.lineTo(x - size * 1.1f, cy);
+                      path.lineTo(x, cy + size);
+                  } else {
+                      path.moveTo(x, cy - size);
+                      path.lineTo(x + size * 1.1f, cy);
+                      path.lineTo(x, cy + size);
+                  }
+                  path.close();
+                  c.drawPath(path, p);
+              }
+
+              @Override
+              protected void onDraw(Canvas c) {
+                  float w = getWidth(), h = getHeight(), s = Math.min(w, h), cx = w / 2f, cy = h / 2f;
+                  p.setStrokeWidth(s * 0.075f);
+                  p.setStrokeCap(Paint.Cap.ROUND);
+                  p.setStrokeJoin(Paint.Join.ROUND);
+                  if (type == PAUSE) {
+                      p.setStyle(Paint.Style.FILL);
+                      float bw = s * 0.17f, bh = s * 0.52f;
+                      c.drawRect(cx - bw * 1.4f, cy - bh / 2, cx - bw * 0.4f, cy + bh / 2, p);
+                      c.drawRect(cx + bw * 0.4f, cy - bh / 2, cx + bw * 1.4f, cy + bh / 2, p);
+                  } else if (type == PLAY) {
+                      p.setStyle(Paint.Style.FILL);
+                      Path path = new Path();
+                      path.moveTo(cx - s * 0.16f, cy - s * 0.27f);
+                      path.lineTo(cx - s * 0.16f, cy + s * 0.27f);
+                      path.lineTo(cx + s * 0.30f, cy);
+                      path.close();
+                      c.drawPath(path, p);
+                  } else if (type == BACK) {
+                      p.setStyle(Paint.Style.STROKE);
+                      Path path = new Path();
+                      path.moveTo(cx + s * 0.13f, cy - s * 0.26f);
+                      path.lineTo(cx - s * 0.13f, cy);
+                      path.lineTo(cx + s * 0.13f, cy + s * 0.26f);
+                      c.drawPath(path, p);
+                  } else if (type == NEXT) {
+                      p.setStyle(Paint.Style.STROKE);
+                      Path path = new Path();
+                      path.moveTo(cx - s * 0.13f, cy - s * 0.26f);
+                      path.lineTo(cx + s * 0.13f, cy);
+                      path.lineTo(cx - s * 0.13f, cy + s * 0.26f);
+                      c.drawPath(path, p);
+                  } else if (type == REW) {
+                      p.setStyle(Paint.Style.STROKE);
+                      tri(c, cx + s * 0.02f, cy, s * 0.2f, true);
+                      tri(c, cx + s * 0.32f, cy, s * 0.2f, true);
+                  } else if (type == FF) {
+                      p.setStyle(Paint.Style.STROKE);
+                      tri(c, cx - s * 0.32f, cy, s * 0.2f, false);
+                      tri(c, cx - s * 0.02f, cy, s * 0.2f, false);
+                  }
+              }
+          }
+          JAVA
           cat > $JAVA_DIR/SkiPlayerActivity.java <<'JAVA'
           package com.skimedia.app;
 
+          import android.app.AlertDialog;
           import android.content.Intent;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
           import android.net.Uri;
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import android.view.Gravity;
+          import android.view.KeyEvent;
           import android.view.View;
           import android.view.WindowManager;
           import android.widget.FrameLayout;
+          import android.widget.LinearLayout;
+          import android.widget.ProgressBar;
+          import android.widget.SeekBar;
+          import android.widget.TextView;
+          import android.widget.Toast;
           import androidx.appcompat.app.AppCompatActivity;
+          import androidx.media3.common.C;
+          import androidx.media3.common.Format;
           import androidx.media3.common.MediaItem;
           import androidx.media3.common.MediaMetadata;
           import androidx.media3.common.MimeTypes;
           import androidx.media3.common.PlaybackException;
           import androidx.media3.common.Player;
+          import androidx.media3.common.TrackSelectionOverride;
+          import androidx.media3.common.Tracks;
           import androidx.media3.datasource.DefaultHttpDataSource;
           import androidx.media3.exoplayer.DefaultRenderersFactory;
           import androidx.media3.exoplayer.ExoPlayer;
           import androidx.media3.exoplayer.SeekParameters;
           import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
+          import androidx.media3.ui.AspectRatioFrameLayout;
           import androidx.media3.ui.PlayerView;
+          import java.text.SimpleDateFormat;
           import java.util.ArrayList;
+          import java.util.Date;
           import java.util.List;
+          import java.util.Locale;
           import org.json.JSONArray;
           import org.json.JSONObject;
 
           public class SkiPlayerActivity extends AppCompatActivity {
               private ExoPlayer player;
               private PlayerView playerView;
-              private boolean ended = false;
+              private FrameLayout overlay;
+              private SkiIconView playIcon;
+              private SeekBar seek;
+              private TextView posText, durText, clockText;
+              private ProgressBar spinner;
+              private TextView speedBtn, fitBtn;
+              private boolean ended = false, wantNext = false, dragging = false, zoom = false;
               private String error = null;
+              private final Handler handler = new Handler(Looper.getMainLooper());
+              private final float[] speeds = {1f, 1.25f, 1.5f, 2f, 0.75f};
+              private int speedIdx = 0;
+              private final SimpleDateFormat clockFmt = new SimpleDateFormat("h:mm a", Locale.getDefault());
+
+              private final Runnable hideRun = new Runnable() {
+                  @Override
+                  public void run() {
+                      if (player != null && player.isPlaying()) overlay.setVisibility(View.GONE);
+                  }
+              };
+              private final Runnable tickRun = new Runnable() {
+                  @Override
+                  public void run() {
+                      updateProgress();
+                      handler.postDelayed(this, 500);
+                  }
+              };
+
+              private int dp(int v) {
+                  return (int) (v * getResources().getDisplayMetrics().density + 0.5f);
+              }
+
+              private TextView label(String s, int sp, int color, boolean bold) {
+                  TextView t = new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(sp);
+                  t.setTextColor(color);
+                  if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
+                  return t;
+              }
+
+              private TextView pill(String s, boolean filled) {
+                  TextView t = label(s, 12, filled ? Color.WHITE : 0xFFB8A27A, true);
+                  t.setPadding(dp(10), dp(3), dp(10), dp(3));
+                  if (filled) {
+                      GradientDrawable g = new GradientDrawable();
+                      g.setColor(0xFF3B3B3B);
+                      g.setCornerRadius(dp(8));
+                      t.setBackground(g);
+                  }
+                  return t;
+              }
+
+              private TextView action(String s) {
+                  TextView t = label(s, 14, Color.WHITE, true);
+                  t.setPadding(dp(18), dp(10), dp(18), dp(10));
+                  t.setFocusable(true);
+                  t.setClickable(true);
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(0x00000000);
+                  g.setCornerRadius(dp(10));
+                  t.setBackground(g);
+                  t.setOnFocusChangeListener((v, f) -> {
+                      GradientDrawable d = new GradientDrawable();
+                      d.setColor(f ? 0x33FFFFFF : 0x00000000);
+                      d.setCornerRadius(dp(10));
+                      v.setBackground(d);
+                  });
+                  return t;
+              }
+
+              private SkiIconView icon(int type, int size, View.OnClickListener l) {
+                  SkiIconView v = new SkiIconView(this, type);
+                  v.setLayoutParams(new LinearLayout.LayoutParams(dp(size), dp(size)));
+                  v.setFocusable(true);
+                  v.setClickable(true);
+                  v.setOnClickListener(l);
+                  v.setOnFocusChangeListener((x, f) -> {
+                      GradientDrawable d = new GradientDrawable();
+                      d.setColor(f ? 0x33FFFFFF : 0x00000000);
+                      d.setShape(GradientDrawable.OVAL);
+                      x.setBackground(d);
+                  });
+                  return v;
+              }
 
               @Override
               protected void onCreate(Bundle savedInstanceState) {
@@ -988,15 +1177,179 @@ jobs:
 
                   String url = getIntent().getStringExtra("url");
                   String title = getIntent().getStringExtra("title");
+                  String sub = getIntent().getStringExtra("sub");
+                  String badgesJson = getIntent().getStringExtra("badges");
+                  boolean hasNext = getIntent().getBooleanExtra("hasNext", false);
                   long startPos = getIntent().getLongExtra("pos", 0L);
                   String subsJson = getIntent().getStringExtra("subs");
 
                   FrameLayout root = new FrameLayout(this);
                   root.setBackgroundColor(0xFF000000);
                   playerView = new PlayerView(this);
-                  playerView.setControllerShowTimeoutMs(4000);
+                  playerView.setUseController(false);
                   root.addView(playerView, new FrameLayout.LayoutParams(
                       FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+                  spinner = new ProgressBar(this);
+                  FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(56), dp(56));
+                  sp.gravity = Gravity.CENTER;
+                  root.addView(spinner, sp);
+
+                  overlay = new FrameLayout(this);
+                  overlay.setClickable(true);
+                  overlay.setOnClickListener(v -> overlay.setVisibility(View.GONE));
+                  root.addView(overlay, new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                  root.setOnClickListener(v -> showControls());
+
+                  // top and bottom shading
+                  View topShade = new View(this);
+                  GradientDrawable ts = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xCC000000, 0x00000000});
+                  topShade.setBackground(ts);
+                  overlay.addView(topShade, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(150), Gravity.TOP));
+                  View botShade = new View(this);
+                  GradientDrawable bs = new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP, new int[]{0xDD000000, 0x00000000});
+                  botShade.setBackground(bs);
+                  overlay.addView(botShade, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, dp(190), Gravity.BOTTOM));
+
+                  // top bar
+                  LinearLayout top = new LinearLayout(this);
+                  top.setOrientation(LinearLayout.HORIZONTAL);
+                  top.setGravity(Gravity.TOP);
+                  top.setPadding(dp(22), dp(18), dp(26), 0);
+                  top.addView(icon(SkiIconView.BACK, 48, v -> finish()));
+                  LinearLayout info = new LinearLayout(this);
+                  info.setOrientation(LinearLayout.VERTICAL);
+                  info.setPadding(dp(8), 0, 0, 0);
+                  TextView tt = label(title == null ? "" : title, 22, Color.WHITE, true);
+                  tt.setSingleLine(true);
+                  info.addView(tt);
+                  if (sub != null && !sub.isEmpty()) {
+                      TextView st = label(sub, 15, 0xFFC9CFD6, false);
+                      st.setSingleLine(true);
+                      info.addView(st);
+                  }
+                  LinearLayout badges = new LinearLayout(this);
+                  badges.setOrientation(LinearLayout.HORIZONTAL);
+                  badges.setGravity(Gravity.CENTER_VERTICAL);
+                  badges.setPadding(0, dp(6), 0, 0);
+                  try {
+                      JSONArray ba = new JSONArray(badgesJson == null ? "[]" : badgesJson);
+                      for (int i = 0; i < ba.length(); i++) {
+                          String b = ba.optString(i, "");
+                          if (b.isEmpty()) continue;
+                          badges.addView(pill(b, i == 0));
+                      }
+                  } catch (Exception ignored) {
+                  }
+                  info.addView(badges);
+                  top.addView(info, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                  clockText = label("", 22, Color.WHITE, true);
+                  top.addView(clockText);
+                  overlay.addView(top, new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP));
+
+                  // center controls
+                  LinearLayout center = new LinearLayout(this);
+                  center.setOrientation(LinearLayout.HORIZONTAL);
+                  center.setGravity(Gravity.CENTER);
+                  SkiIconView rew = icon(SkiIconView.REW, 72, v -> seekBy(-10000));
+                  playIcon = icon(SkiIconView.PAUSE, 96, v -> togglePlay());
+                  SkiIconView ff = icon(SkiIconView.FF, 72, v -> seekBy(30000));
+                  LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(dp(96), dp(96));
+                  cp.setMargins(dp(56), 0, dp(56), 0);
+                  center.addView(rew);
+                  center.addView(playIcon, cp);
+                  center.addView(ff);
+                  overlay.addView(center, new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+
+                  // bottom area
+                  LinearLayout bottom = new LinearLayout(this);
+                  bottom.setOrientation(LinearLayout.VERTICAL);
+                  bottom.setPadding(dp(30), 0, dp(30), dp(14));
+                  if (hasNext) {
+                      LinearLayout nr = new LinearLayout(this);
+                      nr.setGravity(Gravity.END);
+                      TextView next = action("Next  ›");
+                      next.setOnClickListener(v -> {
+                          wantNext = true;
+                          finish();
+                      });
+                      nr.addView(next);
+                      bottom.addView(nr, new LinearLayout.LayoutParams(
+                          LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                  }
+                  LinearLayout sr = new LinearLayout(this);
+                  sr.setOrientation(LinearLayout.HORIZONTAL);
+                  sr.setGravity(Gravity.CENTER_VERTICAL);
+                  posText = label("0:00", 14, Color.WHITE, false);
+                  durText = label("0:00", 14, Color.WHITE, false);
+                  seek = new SeekBar(this);
+                  seek.setMax(1000);
+                  seek.setPadding(dp(14), 0, dp(14), 0);
+                  seek.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
+                  seek.setProgressBackgroundTintList(android.content.res.ColorStateList.valueOf(0x55FFFFFF));
+                  seek.setThumbTintList(android.content.res.ColorStateList.valueOf(Color.WHITE));
+                  seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+                      @Override
+                      public void onProgressChanged(SeekBar s, int p, boolean fromUser) {
+                          if (fromUser && player != null && player.getDuration() > 0) {
+                              posText.setText(fmt(player.getDuration() * p / 1000L));
+                          }
+                      }
+
+                      @Override
+                      public void onStartTrackingTouch(SeekBar s) {
+                          dragging = true;
+                          handler.removeCallbacks(hideRun);
+                      }
+
+                      @Override
+                      public void onStopTrackingTouch(SeekBar s) {
+                          dragging = false;
+                          if (player != null && player.getDuration() > 0) {
+                              player.seekTo(player.getDuration() * s.getProgress() / 1000L);
+                          }
+                          scheduleHide();
+                      }
+                  });
+                  sr.addView(posText);
+                  sr.addView(seek, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+                  sr.addView(durText);
+                  bottom.addView(sr, new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+                  LinearLayout actions = new LinearLayout(this);
+                  actions.setOrientation(LinearLayout.HORIZONTAL);
+                  actions.setGravity(Gravity.CENTER);
+                  TextView subsBtn = action("CC  Subtitles");
+                  subsBtn.setOnClickListener(v -> pickTrack(C.TRACK_TYPE_TEXT, "Subtitles"));
+                  TextView audioBtn = action("♪  Audio");
+                  audioBtn.setOnClickListener(v -> pickTrack(C.TRACK_TYPE_AUDIO, "Audio"));
+                  speedBtn = action("1x  Speed");
+                  speedBtn.setOnClickListener(v -> {
+                      speedIdx = (speedIdx + 1) % speeds.length;
+                      if (player != null) player.setPlaybackSpeed(speeds[speedIdx]);
+                      speedBtn.setText(fmtSpeed(speeds[speedIdx]) + "  Speed");
+                      scheduleHide();
+                  });
+                  fitBtn = action("⤢  Fit");
+                  fitBtn.setOnClickListener(v -> {
+                      zoom = !zoom;
+                      playerView.setResizeMode(zoom ? AspectRatioFrameLayout.RESIZE_MODE_ZOOM : AspectRatioFrameLayout.RESIZE_MODE_FIT);
+                      fitBtn.setText(zoom ? "⤢  Fill" : "⤢  Fit");
+                      scheduleHide();
+                  });
+                  actions.addView(subsBtn);
+                  actions.addView(audioBtn);
+                  actions.addView(speedBtn);
+                  actions.addView(fitBtn);
+                  bottom.addView(actions, new LinearLayout.LayoutParams(
+                      LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                  overlay.addView(bottom, new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
+
                   setContentView(root);
 
                   // Extension renderers (FFmpeg) give sound for AC3, EAC3, DTS, TrueHD and more.
@@ -1046,10 +1399,18 @@ jobs:
                   player.addListener(new Player.Listener() {
                       @Override
                       public void onPlaybackStateChanged(int state) {
+                          spinner.setVisibility(state == Player.STATE_BUFFERING ? View.VISIBLE : View.GONE);
                           if (state == Player.STATE_ENDED) {
                               ended = true;
                               finish();
                           }
+                      }
+
+                      @Override
+                      public void onIsPlayingChanged(boolean playing) {
+                          playIcon.setType(playing ? SkiIconView.PAUSE : SkiIconView.PLAY);
+                          if (playing) scheduleHide();
+                          else showControls();
                       }
 
                       @Override
@@ -1062,6 +1423,164 @@ jobs:
                   player.setMediaItem(mb.build(), startPos > 0 ? startPos : 0L);
                   player.prepare();
                   player.setPlayWhenReady(true);
+                  handler.post(tickRun);
+                  scheduleHide();
+              }
+
+              private String fmtSpeed(float f) {
+                  return (f == (int) f ? String.valueOf((int) f) : String.valueOf(f)) + "x";
+              }
+
+              private String fmt(long ms) {
+                  long s = Math.max(0, ms / 1000);
+                  long h = s / 3600, m = (s % 3600) / 60, x = s % 60;
+                  if (h > 0) return h + ":" + (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x;
+                  return m + ":" + (x < 10 ? "0" : "") + x;
+              }
+
+              private void updateProgress() {
+                  if (player == null) return;
+                  clockText.setText(clockFmt.format(new Date()));
+                  long d = player.getDuration();
+                  long p = player.getCurrentPosition();
+                  if (!dragging) {
+                      posText.setText(fmt(p));
+                      if (d > 0) seek.setProgress((int) (p * 1000L / d));
+                  }
+                  durText.setText(d > 0 ? fmt(d) : "0:00");
+              }
+
+              private void showControls() {
+                  overlay.setVisibility(View.VISIBLE);
+                  scheduleHide();
+              }
+
+              private void scheduleHide() {
+                  handler.removeCallbacks(hideRun);
+                  handler.postDelayed(hideRun, 4500);
+              }
+
+              private void togglePlay() {
+                  if (player == null) return;
+                  if (player.isPlaying()) player.pause();
+                  else player.play();
+              }
+
+              private void seekBy(long ms) {
+                  if (player == null) return;
+                  long d = player.getDuration();
+                  long t = player.getCurrentPosition() + ms;
+                  if (t < 0) t = 0;
+                  if (d > 0 && t > d - 1000) t = d - 1000;
+                  player.seekTo(t);
+                  scheduleHide();
+              }
+
+              private String trackName(Format f, int n) {
+                  StringBuilder sb = new StringBuilder();
+                  String lang = "";
+                  if (f.language != null && !f.language.equals("und")) {
+                      lang = new Locale(f.language).getDisplayLanguage();
+                  }
+                  if (f.label != null && !f.label.isEmpty()) sb.append(f.label);
+                  else if (!lang.isEmpty()) sb.append(lang);
+                  else sb.append("Track ").append(n);
+                  if (f.sampleMimeType != null) {
+                      String m = f.sampleMimeType;
+                      String codec = "";
+                      if (m.contains("eac3")) codec = "Dolby Digital+";
+                      else if (m.contains("ac3")) codec = "Dolby Digital";
+                      else if (m.contains("truehd")) codec = "TrueHD";
+                      else if (m.contains("dts") || m.contains("vnd.dts")) codec = "DTS";
+                      else if (m.contains("opus")) codec = "Opus";
+                      else if (m.contains("aac") || m.contains("mp4a")) codec = "AAC";
+                      if (!codec.isEmpty()) sb.append("  ·  ").append(codec);
+                  }
+                  if (f.channelCount > 0 && f.sampleMimeType != null && f.sampleMimeType.startsWith("audio")) {
+                      int c = f.channelCount;
+                      sb.append("  ·  ").append(c == 6 ? "5.1" : c == 8 ? "7.1" : c == 2 ? "Stereo" : c + " ch");
+                  }
+                  return sb.toString();
+              }
+
+              private void pickTrack(final int type, String title) {
+                  if (player == null) return;
+                  final List<Tracks.Group> groups = new ArrayList<>();
+                  final List<Integer> idx = new ArrayList<>();
+                  final List<String> names = new ArrayList<>();
+                  names.add(type == C.TRACK_TYPE_TEXT ? "Off" : "Auto");
+                  int checked = 0;
+                  boolean disabled = player.getTrackSelectionParameters().disabledTrackTypes.contains(type);
+                  for (Tracks.Group g : player.getCurrentTracks().getGroups()) {
+                      if (g.getType() != type) continue;
+                      for (int i = 0; i < g.length; i++) {
+                          if (!g.isTrackSupported(i)) continue;
+                          groups.add(g);
+                          idx.add(i);
+                          names.add(trackName(g.getTrackFormat(i), groups.size()));
+                          if (g.isTrackSelected(i) && !disabled) checked = names.size() - 1;
+                      }
+                  }
+                  if (names.size() == 1) {
+                      Toast.makeText(this, "No " + title.toLowerCase() + " tracks in this video", Toast.LENGTH_SHORT).show();
+                      return;
+                  }
+                  handler.removeCallbacks(hideRun);
+                  new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                      .setTitle(title)
+                      .setSingleChoiceItems(names.toArray(new String[0]), checked, (dialog, which) -> {
+                          if (player != null) {
+                              if (which == 0) {
+                                  if (type == C.TRACK_TYPE_TEXT) {
+                                      player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
+                                          .setTrackTypeDisabled(type, true).build());
+                                  } else {
+                                      player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
+                                          .clearOverridesOfType(type).setTrackTypeDisabled(type, false).build());
+                                  }
+                              } else {
+                                  Tracks.Group g = groups.get(which - 1);
+                                  player.setTrackSelectionParameters(player.getTrackSelectionParameters().buildUpon()
+                                      .setTrackTypeDisabled(type, false)
+                                      .setOverrideForType(new TrackSelectionOverride(g.getMediaTrackGroup(), idx.get(which - 1)))
+                                      .build());
+                              }
+                          }
+                          dialog.dismiss();
+                          scheduleHide();
+                      })
+                      .setOnCancelListener(d -> scheduleHide())
+                      .show();
+              }
+
+              @Override
+              public boolean dispatchKeyEvent(KeyEvent e) {
+                  if (e.getAction() == KeyEvent.ACTION_DOWN) {
+                      int k = e.getKeyCode();
+                      boolean shown = overlay.getVisibility() == View.VISIBLE;
+                      if (k == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || k == KeyEvent.KEYCODE_SPACE) {
+                          togglePlay();
+                          return true;
+                      }
+                      if (k == KeyEvent.KEYCODE_MEDIA_REWIND) { seekBy(-10000); return true; }
+                      if (k == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD) { seekBy(30000); return true; }
+                      if (!shown) {
+                          if (k == KeyEvent.KEYCODE_DPAD_LEFT) { seekBy(-10000); showControls(); return true; }
+                          if (k == KeyEvent.KEYCODE_DPAD_RIGHT) { seekBy(30000); showControls(); return true; }
+                          if (k == KeyEvent.KEYCODE_DPAD_CENTER || k == KeyEvent.KEYCODE_ENTER || k == KeyEvent.KEYCODE_DPAD_UP || k == KeyEvent.KEYCODE_DPAD_DOWN) {
+                              showControls();
+                              playIcon.requestFocus();
+                              return true;
+                          }
+                      } else {
+                          scheduleHide();
+                          if (k == KeyEvent.KEYCODE_BACK) {
+                              overlay.setVisibility(View.GONE);
+                              return true;
+                          }
+                      }
+                  }
+                  return super.dispatchKeyEvent(e);
               }
 
               private void hideSystemUi() {
@@ -1088,6 +1607,7 @@ jobs:
                       r.putExtra("duration", player.getDuration());
                   }
                   r.putExtra("ended", ended);
+                  r.putExtra("next", wantNext);
                   if (error != null) r.putExtra("error", error);
                   setResult(RESULT_OK, r);
                   super.finish();
@@ -1102,6 +1622,7 @@ jobs:
               @Override
               protected void onDestroy() {
                   super.onDestroy();
+                  handler.removeCallbacksAndMessages(null);
                   if (player != null) {
                       player.release();
                       player = null;
@@ -1136,6 +1657,11 @@ jobs:
                   intent.putExtra("title", call.getString("title", ""));
                   Double pos = call.getDouble("pos", 0.0);
                   intent.putExtra("pos", pos == null ? 0L : (long) pos.doubleValue());
+                  intent.putExtra("sub", call.getString("sub", ""));
+                  JSArray badges = call.getArray("badges");
+                  if (badges != null) intent.putExtra("badges", badges.toString());
+                  Boolean hn = call.getBoolean("next", false);
+                  intent.putExtra("hasNext", hn != null && hn);
                   JSArray subs = call.getArray("subs");
                   if (subs != null) intent.putExtra("subs", subs.toString());
                   startActivityForResult(call, intent, "playResult");
@@ -1150,6 +1676,7 @@ jobs:
                       ret.put("position", data.getLongExtra("position", 0L));
                       ret.put("duration", data.getLongExtra("duration", 0L));
                       ret.put("ended", data.getBooleanExtra("ended", false));
+                      ret.put("next", data.getBooleanExtra("next", false));
                       String err = data.getStringExtra("error");
                       if (err != null) ret.put("error", err);
                   }
