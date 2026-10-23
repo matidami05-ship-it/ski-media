@@ -667,7 +667,8 @@ document.addEventListener("input",e=>{if(e.target.id==="cq"){CLD.q=e.target.valu
 
 function lib(){
 const wl=S.watchlist,w=CAT.map((m,i)=>i).filter(i=>S.watched[CAT[i].id]);
-const seg='<div class="vseg" style="margin-top:16px"><button data-lm="lib" aria-pressed="'+(CLD.mode==="lib")+'">My library</button><button data-lm="cloud" aria-pressed="'+(CLD.mode==="cloud")+'">Debrid cloud</button></div>';
+if(S.hideCloud)CLD.mode="lib";
+const seg=S.hideCloud?'':'<div class="vseg" style="margin-top:16px"><button data-lm="lib" aria-pressed="'+(CLD.mode==="lib")+'">My library</button><button data-lm="cloud" aria-pressed="'+(CLD.mode==="cloud")+'">Debrid cloud</button></div>';
 if(CLD.mode==="cloud")return seg+cloudView();
 return seg+`<h2>Watchlist</h2>${wl.length?`<div class="row">${wl.map(i=>card(i)).join("")}</div>`:'<p class="meta">Nothing saved yet. Open a title and tap Save.</p>'}
 <h2>Watched history</h2>${w.length?`<div class="row">${w.map(i=>card(i)).join("")}</div>`:'<p class="meta">Titles you finish show up here.</p>'}
@@ -756,6 +757,7 @@ ${S.debrids.map((d,n)=>`<div class="src"><div><b>${esc(d.prov)}</b><small>${n===
 ${(f=>f.length?`<label for="dp">Add a service</label><select id="dp">${f.map(p=>`<option>${p}</option>`).join("")}</select>
 <label for="dt">API token</label><input id="dt" type="password" autocomplete="off" placeholder="Paste your API token">
 <button class="btn" data-link="debrid">Link account</button>`:'<p class="meta">All supported services are linked.</p>')(PROVIDERS.filter(p=>!S.debrids.some(d=>d.prov===p)))}</div>
+<div class="panel"><h3>Debrid cloud</h3><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="hcl" ${S.hideCloud?"checked":""} style="width:auto"> Hide Debrid cloud from the Library</label></div>
 <div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
 <div class="panel"><h3>TV mode</h3><p>Layout for Android TV and other remote-control screens. Auto turns it on when there is no touchscreen.</p><label for="tvm">TV mode</label><select id="tvm"><option value="auto" ${(S.tvmode||"auto")==="auto"?"selected":""}>Auto</option><option value="on" ${S.tvmode==="on"?"selected":""}>On</option><option value="off" ${S.tvmode==="off"?"selected":""}>Off</option></select></div>
 <div class="panel"><h3>TMDB</h3><span class="status ${S.tmdb.on?'on':''}">${S.tmdb.on?'Linked':'Not linked'}</span>
@@ -834,7 +836,7 @@ if(d.rm!==undefined){S.addons.splice(+d.rm,1);save();render();return}
 if(d.sync!==undefined){toast("Syncing...");doSync();return}
 });
 document.addEventListener("keydown",e=>{if(e.target.id==="q"&&e.key==="Enter"){addRecent(e.target.value);e.target.blur()}});
-document.addEventListener("change",e=>{if(e.target.id==="sv"){EP.vs=+e.target.value;render();return}if(e.target.id==="plr"){S.player=e.target.value;save();return}if(e.target.id==="sn"||e.target.id==="en"){const m=CAT[view];if(e.target.id==="sn"){EP.s=+e.target.value||1;const f=(MC[m.aid||m.id]||[]).filter(x=>x.season===EP.s).map(x=>x.episode);EP.e=f.length?Math.min(...f):1}else EP.e=+e.target.value||1;STR=[];render();return}
+document.addEventListener("change",e=>{if(e.target.id==="sv"){EP.vs=+e.target.value;render();return}if(e.target.id==="plr"){S.player=e.target.value;save();return}if(e.target.id==="hcl"){S.hideCloud=e.target.checked;CLD.mode="lib";save();toast(S.hideCloud?"Debrid cloud hidden":"Debrid cloud shown");return}if(e.target.id==="sn"||e.target.id==="en"){const m=CAT[view];if(e.target.id==="sn"){EP.s=+e.target.value||1;const f=(MC[m.aid||m.id]||[]).filter(x=>x.season===EP.s).map(x=>x.episode);EP.e=f.length?Math.min(...f):1}else EP.e=+e.target.value||1;STR=[];render();return}
 if(e.target.id==="sc"){S.simkl.scrobble=e.target.checked;save()}});
 document.addEventListener("input",e=>{if(e.target.id==="q"){Q=e.target.value;show();tsearch(Q)}});
 render();
