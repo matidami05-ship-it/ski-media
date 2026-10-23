@@ -40,6 +40,34 @@ const Ski={
   }
 };
 
+Ski.tb={
+  async call(tok,path,opt={}){
+    const r=await Ski.px("https://api.torbox.app/v1/api"+path,{...opt,headers:{Authorization:"Bearer "+tok,...(opt.headers||{})}});
+    if(r.status===401||r.status===403)throw new Error("TorBox rejected your API key");
+    let j=null;try{j=await r.json()}catch(e){}
+    if(!r.ok||(j&&j.success===false))throw new Error("TorBox: "+((j&&(j.detail||j.error))||("error "+r.status)));
+    return j},
+  async resolve(tok,hash,fileIdx,onStatus){
+    const fd=new FormData();fd.append("magnet","magnet:?xt=urn:btih:"+hash);fd.append("seed","1");fd.append("allow_zip","false");
+    const add=await Ski.tb.call(tok,"/torrents/createtorrent",{method:"POST",body:fd});
+    const id=add.data&&(add.data.torrent_id||add.data.queued_id);
+    if(!id)throw new Error("TorBox didn't accept this source. Try another.");
+    let info=null;
+    for(let n=0;n<30;n++){
+      const r=await Ski.tb.call(tok,"/torrents/mylist?id="+id+"&bypass_cache=true");
+      info=Array.isArray(r.data)?r.data[0]:r.data;
+      if(info&&(info.download_finished||info.download_present)&&(info.files||[]).length)break;
+      if(info&&/error|failed|dead/i.test(info.download_state||""))throw new Error("TorBox: "+info.download_state);
+      if(onStatus)onStatus(((info&&info.download_state)||"queued")+" "+Math.round(((info&&info.progress)||0)*100)+"%");
+      await new Promise(r=>setTimeout(r,2000))}
+    if(!info||!(info.files||[]).length||!(info.download_finished||info.download_present))throw new Error("Not ready yet. Try another source.");
+    const vids=info.files.filter(f=>/\.(mp4|mkv|webm|m4v|avi)$/i.test(f.name||f.short_name||"")).sort((a,b)=>b.size-a.size);
+    const pick=(fileIdx!=null&&info.files[fileIdx]&&/\.(mp4|mkv|webm|m4v|avi)$/i.test(info.files[fileIdx].name||""))?info.files[fileIdx]:(vids[0]||info.files[0]);
+    const d=await Ski.tb.call(tok,"/torrents/requestdl?token="+encodeURIComponent(tok)+"&torrent_id="+id+"&file_id="+pick.id+"&zip_link=false");
+    if(!d.data)throw new Error("TorBox couldn't make a link");
+    return{url:d.data,id:null}}
+};
+
 // Simkl: PIN sign-in, sync, scrobble. Calls go through server.py.
 Ski.simkl={
   async call(cid,tok,path,opt={}){

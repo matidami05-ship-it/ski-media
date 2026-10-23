@@ -518,9 +518,13 @@ return sc}
 async function resolveSource(s,onSt){let url=/^https?:/i.test(s.url||"")?s.url:"",tc="",prov=s.addon||"";
 if(!url){const hash=s.infoHash||((s.url||"").match(/btih:([a-f0-9]{40})/i)||[])[1];if(!hash)throw new Error("This source type isn't supported yet");
 if(!S.debrids.length)throw new Error("Link a debrid account in Settings first");
-const rd=S.debrids.find(x=>x.prov==="Real-Debrid");if(!rd)throw new Error("Only Real-Debrid is supported for now");prov=rd.prov;
-const r=await Ski.rd.resolve(rd.token,hash,s.fileIdx,t=>onSt("Real-Debrid: "+t));url=r.url;
-if(!useVlc()){onSt("Checking audio compatibility...");tc=await Ski.rd.transcode(rd.token,r.id)}}
+const sup=S.debrids.filter(x=>x.prov==="Real-Debrid"||x.prov==="TorBox");if(!sup.length)throw new Error("Only Real-Debrid and TorBox can play streams for now");
+let lastErr=null;for(const d of sup){try{prov=d.prov;
+if(d.prov==="TorBox"){const r=await Ski.tb.resolve(d.token,hash,s.fileIdx,t=>onSt("TorBox: "+t));url=r.url;tc=""}
+else{const r=await Ski.rd.resolve(d.token,hash,s.fileIdx,t=>onSt("Real-Debrid: "+t));url=r.url;
+if(!useVlc()){onSt("Checking audio compatibility...");tc=await Ski.rd.transcode(d.token,r.id)}}
+lastErr=null;break}catch(e){lastErr=e;onSt(d.prov+" failed, trying next...")}}
+if(lastErr)throw lastErr}
 return{url,tc,s,prov}}
 function launchedUI(p,r,vi){LAST={url:r.url,title:CAT[vi].t,vi,info:streamInfo(r.s),prov:r.prov};p.style.cssText="display:flex;flex-direction:column;align-items:center;gap:12px";
 p.innerHTML='<div>Opening in VLC...</div><div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button class="btn alt" style="margin:0" data-vlc>Open VLC again</button><button class="btn alt" style="margin:0" data-inapp>Play in app</button><button class="btn alt" style="margin:0" data-copy>Copy link</button></div>'}
@@ -732,7 +736,7 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 
 function settings(){
 return `<h2>Settings</h2><div class="panel"><h3>Debrid accounts</h3><span class="status ${S.debrids.length?'on':''}">${S.debrids.length?S.debrids.length+' linked':'Not linked'}</span>
-<p>Link as many services as you like. Real-Debrid is the only one that plays streams and powers Debrid cloud right now; the others are saved for later.</p>
+<p>Link as many services as you like. Real-Debrid and TorBox play streams (the first in your list is tried first). Debrid cloud uses Real-Debrid. The others are saved for later.</p>
 ${S.debrids.map((d,n)=>`<div class="src"><div><b>${esc(d.prov)}</b><small>${n===0?'Primary':'Backup'}</small></div>${n?`<button class="btn alt" style="margin:0;padding:8px 12px" data-top="${n}">Make primary</button>`:''}<button class="btn alt" style="margin:0;padding:8px 12px" data-rmdeb="${n}">Remove</button></div>`).join("")}
 ${(f=>f.length?`<label for="dp">Add a service</label><select id="dp">${f.map(p=>`<option>${p}</option>`).join("")}</select>
 <label for="dt">API token</label><input id="dt" type="password" autocomplete="off" placeholder="Paste your API token">
