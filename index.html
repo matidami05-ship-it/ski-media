@@ -617,35 +617,49 @@ el.insertAdjacentHTML("beforeend",`<h2>${esc(x.c.name)} from ${esc(x.a.name)}</h
 const e1=$("#srows");if(e1&&t===loadSports.t){e1.style.minHeight="";KH=0}}
 function search(){return `<h2>Search</h2><input id="q" type="search" value="${esc(Q)}" placeholder="Search titles, cast, genres" autocomplete="off" aria-label="Search"><div id="res" style="margin-top:14px">${results()}</div><p class="note">Titles from TMDB appear when your API key is linked.</p>`}
 
+function showTrailer(k){closeTrailer();const o=document.createElement("div");o.id="trl";
+o.style.cssText="position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column";
+o.innerHTML='<div style="display:flex;gap:10px;padding:10px;align-items:center"><button class="btn alt" data-trx style="margin:0">\u2190 Close</button><span style="flex:1"></span><button class="btn alt" data-try style="margin:0">Open in YouTube</button></div><iframe style="flex:1;border:0;width:100%" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" src="https://www.youtube-nocookie.com/embed/'+encodeURIComponent(k)+'?autoplay=1&playsinline=1&rel=0&modestbranding=1"></iframe>';
+o.querySelector("[data-trx]").onclick=closeTrailer;o.querySelector("[data-try]").onclick=()=>window.open("https://www.youtube.com/watch?v="+k,"_blank");
+document.body.appendChild(o);window.__trl=1}
+function closeTrailer(){const o=document.getElementById("trl");if(o){o.remove();window.__trl=0;return true}return false}
+
 /* ---------- Debrid cloud (Real-Debrid library) ---------- */
-const CLD={mode:"lib",kind:"t",t:null,d:null,busy:0,err:"",q:"",open:null};
+const CLD={svc:"rd",mode:"lib",kind:"t",tb:null,t:null,d:null,busy:0,err:"",q:"",open:null};
+function tbTok(){const d=S.debrids.find(x=>x.prov==="TorBox");return d?d.token:""}
+function cloudTok(){return CLD.svc==="tb"?tbTok():rdTok()}
+function tbNorm(x){return{id:x.id,filename:x.name,bytes:x.size,status:(x.download_finished||x.download_present)?"downloaded":(x.download_state||"queued"),progress:Math.round((x.progress||0)*100),tbfiles:(x.files||[]).map(f=>({id:f.id,path:f.name||f.short_name,bytes:f.size}))}}
 function rdTok(){const d=S.debrids.find(x=>/real/i.test(x.prov));return d?d.token:""}
-async function cloudLoad(force){const tok=rdTok();if(!tok)return;if(CLD.busy||(!force&&CLD.t&&CLD.d))return;
+async function cloudLoad(force){if(!rdTok()&&tbTok())CLD.svc="tb";if(CLD.svc==="rd"&&!rdTok()&&tbTok())CLD.svc="tb";const tok=cloudTok();if(!tok)return;if(CLD.busy||(!force&&(CLD.svc==="tb"?CLD.tb:CLD.t&&CLD.d)))return;
 CLD.busy=1;CLD.err="";libPaint();
-try{const [t,d]=await Promise.all([Ski.rd.call(tok,"/torrents?limit=200"),Ski.rd.call(tok,"/downloads?limit=200")]);CLD.t=Array.isArray(t)?t:[];CLD.d=Array.isArray(d)?d:[]}
+try{if(CLD.svc==="tb"){const r=await Ski.tb.call(tok,"/torrents/mylist?bypass_cache=true");CLD.tb=(Array.isArray(r.data)?r.data:[]).map(tbNorm)}else{const [t,d]=await Promise.all([Ski.rd.call(tok,"/torrents?limit=200"),Ski.rd.call(tok,"/downloads?limit=200")]);CLD.t=Array.isArray(t)?t:[];CLD.d=Array.isArray(d)?d:[]}}
 catch(e){CLD.err=e.message||"Couldn't load your debrid cloud"}
 CLD.busy=0;libPaint()}
 function libPaint(){if(S.tab!=="lib"||view!==null)return;const a=$("#app");if(a)a.innerHTML=lib()}
 function fmtSz(b){b=+b||0;return b>=1e9?(b/1e9).toFixed(1)+" GB":b>=1e6?Math.round(b/1e6)+" MB":Math.round(b/1e3)+" KB"}
-function cloudRows(){const q=CLD.q.trim().toLowerCase(),L=(CLD.kind==="t"?CLD.t:CLD.d)||[];
+function cloudRows(){const q=CLD.q.trim().toLowerCase(),L=(CLD.svc==="tb"?CLD.tb:CLD.kind==="t"?CLD.t:CLD.d)||[];
 const a=L.filter(x=>!q||String(x.filename||"").toLowerCase().includes(q));
 if(!a.length)return'<p class="meta" style="padding:14px 0">'+(q?"Nothing matches your search.":CLD.kind==="t"?"No torrents in your Real-Debrid account yet.":"No downloads yet.")+'</p>';
-return a.slice(0,150).map(x=>{const i=L.indexOf(x),ready=CLD.kind==="t"?x.status==="downloaded":true;
-return'<div class="src cldr" tabindex="0" role="button" data-cl="'+i+'"><div style="flex:1;min-width:0"><b class="tvn">'+esc(x.filename||"Untitled")+'</b><small>'+esc(fmtSz(CLD.kind==="t"?x.bytes:x.filesize))+(CLD.kind==="t"?" · "+(ready?"Ready":esc(x.status)+" "+(x.progress||0)+"%"):"")+'</small></div><span>'+(ready?"▶":"…")+'</span></div>'}).join("")}
+return a.slice(0,150).map(x=>{const i=L.indexOf(x),ready=(CLD.kind==="t"||CLD.svc==="tb")?x.status==="downloaded":true;
+return'<div class="src cldr" tabindex="0" role="button" data-cl="'+i+'"><div style="flex:1;min-width:0"><b class="tvn">'+esc(x.filename||"Untitled")+'</b><small>'+esc(fmtSz((CLD.kind==="t"||CLD.svc==="tb")?x.bytes:x.filesize))+((CLD.kind==="t"||CLD.svc==="tb")?" · "+(ready?"Ready":esc(x.status)+" "+(x.progress||0)+"%"):"")+'</small></div><span>'+(ready?"▶":"…")+'</span></div>'}).join("")}
 function cloudView(){
-if(!rdTok())return'<div class="panel"><h3>Link Real-Debrid</h3><p>Add your Real-Debrid token in Settings to browse and play everything in your account.</p><button class="btn" data-tab="settings">Open settings</button></div>';
-if(CLD.open){const o=CLD.open,fs=(o.files||[]).filter(f=>f.selected===1);
+if(!rdTok()&&!tbTok())return'<div class="panel"><h3>Link Real-Debrid or TorBox</h3><p>Add your Real-Debrid token or TorBox API key in Settings to browse and play everything in your account.</p><button class="btn" data-tab="settings">Open settings</button></div>';
+if(CLD.open){const o=CLD.open,fs=o.tbfiles?o.tbfiles:(o.files||[]).filter(f=>f.selected===1);
 return'<button class="btn alt" data-clback style="margin:6px 0 12px">← Back</button><h2 style="margin-top:6px">'+esc(o.filename||"")+'</h2><div>'+(fs.length?fs.map((f,k)=>'<div class="src cldr" tabindex="0" role="button" data-clf="'+k+'"><div style="flex:1;min-width:0"><b class="tvn">'+esc(String(f.path||"").replace(/^\//,""))+'</b><small>'+esc(fmtSz(f.bytes))+'</small></div><span>▶</span></div>').join(""):'<p class="meta">No files selected in this torrent yet.</p>')+'</div>'}
-return'<div class="vseg"><button data-ck="t" aria-pressed="'+(CLD.kind==="t")+'">Torrents'+(CLD.t?" ("+CLD.t.length+")":"")+'</button><button data-ck="d" aria-pressed="'+(CLD.kind==="d")+'">Downloads'+(CLD.d?" ("+CLD.d.length+")":"")+'</button></div><input id="cq" placeholder="Search your cloud" value="'+esc(CLD.q)+'" autocomplete="off">'+(CLD.busy?'<p class="meta" style="margin-top:12px">Loading your cloud…</p>':CLD.err?'<div class="panel" style="margin-top:12px"><p>'+esc(CLD.err)+'</p></div>':'<div id="cldl" style="margin-top:6px">'+cloudRows()+'</div>')}
-document.addEventListener("click",e=>{const el=e.target.closest("[data-lm],[data-ck],[data-cl],[data-clf],[data-clback],[data-clref]");if(!el)return;const d=el.dataset;
+const both=rdTok()&&tbTok(),sv=both?'<div class="vseg" style="margin-bottom:8px"><button data-cs="rd" aria-pressed="'+(CLD.svc==="rd")+'">Real-Debrid</button><button data-cs="tb" aria-pressed="'+(CLD.svc==="tb")+'">TorBox</button></div>':'';
+return sv+(CLD.svc==="tb"?'':'<div class="vseg"><button data-ck="t" aria-pressed="'+(CLD.kind==="t")+'">Torrents'+(CLD.t?" ("+CLD.t.length+")":"")+'</button><button data-ck="d" aria-pressed="'+(CLD.kind==="d")+'">Downloads'+(CLD.d?" ("+CLD.d.length+")":"")+'</button></div>')+'<input id="cq" placeholder="Search your cloud" value="'+esc(CLD.q)+'" autocomplete="off">'+(CLD.busy?'<p class="meta" style="margin-top:12px">Loading your cloud…</p>':CLD.err?'<div class="panel" style="margin-top:12px"><p>'+esc(CLD.err)+'</p></div>':'<div id="cldl" style="margin-top:6px">'+cloudRows()+'</div>')}
+document.addEventListener("click",e=>{const el=e.target.closest("[data-lm],[data-cs],[data-ck],[data-cl],[data-clf],[data-clback],[data-clref]");if(!el)return;const d=el.dataset;
 if(d.lm!==undefined){CLD.mode=d.lm;CLD.open=null;libPaint();if(d.lm==="cloud")cloudLoad();return}
+if(d.cs!==undefined){CLD.svc=d.cs;CLD.open=null;libPaint();cloudLoad();return}
 if(d.ck!==undefined){CLD.kind=d.ck;libPaint();return}
 if(d.clback!==undefined){CLD.open=null;libPaint();return}
 if(d.clref!==undefined){cloudLoad(true);return}
-if(d.cl!==undefined){const L=(CLD.kind==="t"?CLD.t:CLD.d)||[],x=L[+d.cl];if(!x)return;
+if(d.cl!==undefined){const L=(CLD.svc==="tb"?CLD.tb:CLD.kind==="t"?CLD.t:CLD.d)||[],x=L[+d.cl];if(!x)return;
+if(CLD.svc==="tb"){if(x.status!=="downloaded"){toast("Still downloading ("+x.progress+"%)");return}CLD.open=x;libPaint();return}
 if(CLD.kind==="d"){playAny(x.download,x.filename,"c|"+x.filename);return}
 if(x.status!=="downloaded"){toast("Still downloading ("+(x.progress||0)+"%)");return}
 toast("Opening...");Ski.rd.call(rdTok(),"/torrents/info/"+x.id).then(info=>{CLD.open=info;libPaint();(document.getElementById("scr")||window).scrollTo(0,0)}).catch(er=>toast(er.message));return}
+if(d.clf!==undefined&&CLD.open&&CLD.open.tbfiles){const f=CLD.open.tbfiles[+d.clf];if(!f)return;toast("Preparing...");Ski.tb.call(tbTok(),"/torrents/requestdl?token="+encodeURIComponent(tbTok())+"&torrent_id="+CLD.open.id+"&file_id="+f.id+"&zip_link=false").then(u=>{const nm=String(f.path||"").split("/").pop();playAny(u.data,nm,"c|"+nm)}).catch(er=>toast(er.message));return}
 if(d.clf!==undefined&&CLD.open){const o=CLD.open,fs=(o.files||[]).filter(f=>f.selected===1),f=fs[+d.clf],link=(o.links||[])[+d.clf];if(!f||!link){toast("That file isn't ready");return}
 toast("Preparing...");Ski.rd.call(rdTok(),"/unrestrict/link",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"link="+encodeURIComponent(link)}).then(u=>{const nm=String(f.path||"").split("/").pop();playAny(u.download,nm,"c|"+nm)}).catch(er=>toast(er.message))}});
 document.addEventListener("input",e=>{if(e.target.id==="cq"){CLD.q=e.target.value;const l=$("#cldl");if(l)l.innerHTML=cloudRows()}});
@@ -784,7 +798,7 @@ const er=e.target.closest(".ep");if(er&&!e.target.closest(".epck")&&er.dataset.e
 const el=e.target.closest("button");if(!el)return;const d=el.dataset;
 if(d.exp!==undefined){el.classList.toggle("open");return}
 if(d.rec!==undefined){const t=tm(view),r=t&&t.rec&&t.rec[+d.rec];if(r){const i=adopt(r);STR=[];view=i;render();(document.getElementById("scr")||window).scrollTo(0,0);loadTmdb(i)}return}
-if(d.trailer!==undefined){const t=dInfo(view).trailer;if(t)window.open("https://www.youtube.com/watch?v="+t,"_blank");else toast("No trailer available");return}
+if(d.trailer!==undefined){const t=dInfo(view).trailer;if(t)showTrailer(t);else toast("No trailer available");return}
 if(d.epw!==undefined){const p=d.epw.split(":"),k=CAT[view].id+"|"+p[0]+"|"+p[1];if(S.eps[k]){delete S.eps[k];queue("unepisode:"+k)}else{S.eps[k]=1;queue("episode:"+k)}save();render();return}
 if(d.tab){S.tab=d.tab;view=null;save();render();(document.getElementById("scr")||window).scrollTo(0,0);return}
 if(d.open!==undefined){if(S.tab==="search")addRecent(Q);STR=[];view=+d.open;render();(document.getElementById("scr")||window).scrollTo(0,0);loadTmdb(view);return}
@@ -980,7 +994,7 @@ if(go(D[0],D[1]))e.preventDefault()});
 document.addEventListener("change",e=>{if(e.target.id==="tvm"){S.tvmode=e.target.value;save();render()}});
 })();
 
-window.__skiBack=function(){try{if(document.getElementById("tvp")){tvClose();return 1}if(document.getElementById("vodd")){vodClose();return 1}if(history.state&&history.state.pv){history.back();return 1}if(view!==null&&view!==undefined){view=null;render();return 1}}catch(e){}return 0};
+window.__skiBack=function(){try{if(closeTrailer())return 1;if(document.getElementById("tvp")){tvClose();return 1}if(document.getElementById("vodd")){vodClose();return 1}if(history.state&&history.state.pv){history.back();return 1}if(view!==null&&view!==undefined){view=null;render();return 1}}catch(e){}return 0};
 render();
 (function(){const b=document.getElementById("boot");if(!b)return;let done=0;
 function end(){if(done)return;done=1;b.classList.add("out");setTimeout(()=>b.remove(),600)}
