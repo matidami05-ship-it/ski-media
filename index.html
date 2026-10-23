@@ -331,7 +331,7 @@ const PROVIDERS=["Real-Debrid","AllDebrid","Premiumize","TorBox","Debrid-Link"];
 let S;
 try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
-S.tmdb=S.tmdb||{on:false,key:""};S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
+S.tmdb=S.tmdb||{on:false,key:""};S.mdb=S.mdb||{key:"",lists:[]};S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
 S.debrids=S.debrids||(S.debrid&&S.debrid.on?[{prov:S.debrid.prov,token:S.debrid.token}]:[]);
 S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
@@ -551,6 +551,18 @@ let last="";for(const s of c){try{const r=await resolveSource(s,t=>{if(view===vi
 catch(err){last=err.message;if(/Settings|Only Real-Debrid|rejected/.test(last))break;if(view===vi)p.textContent="That source failed ("+last+"). Trying the next one..."}}
 if(view===vi)p.textContent="No source worked: "+last}
 const RC={};let STR=[];
+const MDBC={};
+async function mdbGet(path){const r=await Ski.px("https://api.mdblist.com"+path+(path.includes("?")?"&":"?")+"apikey="+encodeURIComponent(S.mdb.key));if(!r.ok)throw new Error("MDBList error "+r.status);return r.json()}
+const MDBN={imdb:"IMDb",tmdb:"TMDB",trakt:"Trakt",letterboxd:"Letterboxd",tomatoes:"Rotten Tomatoes",tomatoesaudience:"Audience",metacritic:"Metacritic",metacriticuser:"Metacritic users",rogerebert:"Roger Ebert",myanimelist:"MAL"};
+function mdbRatings(i){const m=CAT[i];if(!S.mdb.key||!m)return;const id=m.aid||m.id;if(!/^tt\d+$/.test(id))return;
+const paint=r=>{const el=document.getElementById("mdr");if(!el||view!==i)return;el.innerHTML=r.map(x=>'<span class="bx">'+esc(MDBN[x.source]||x.source)+' '+esc(String(x.value))+'</span>').join("")};
+if(MDBC[id]){paint(MDBC[id]);return}
+mdbGet("/imdb/"+(isTv(m)?"show":"movie")+"/"+id).then(j=>{const r=(j.ratings||[]).filter(x=>x.value!=null&&MDBN[x.source]);MDBC[id]=r;paint(r)}).catch(()=>{})}
+async function mdbRows(t){if(!S.mdb.key)return;for(const L of S.mdb.lists){let j;try{j=MDBC["L"+L.u+"/"+L.s]=MDBC["L"+L.u+"/"+L.s]||await mdbGet("/lists/"+encodeURIComponent(L.u)+"/"+encodeURIComponent(L.s)+"/items?limit=40")}catch(e){continue}
+const el=$("#arows");if(!el||t!==loadRows.t)return;
+const mk=(a,ty)=>(a||[]).filter(x=>x.imdb_id).map(x=>adoptM({id:x.imdb_id,name:x.title,year:x.release_year,poster:"https://images.metahub.space/poster/medium/"+x.imdb_id+"/img"},ty));
+const ids=mk(j.movies,"movie").concat(mk(j.shows,"series")).slice(0,40);if(!ids.length)continue;
+el.insertAdjacentHTML("beforeend",`<h2>${esc(L.name||L.s)} <small class="by">MDBList</small></h2><div class="row">${ids.map(i=>card(i)).join("")}</div>`)}}
 function adoptM(m,type){const id="addon"+type+m.id;let i=CAT.findIndex(c=>c.id===id);
 if(i<0){const o={id,aid:m.id,type,t:m.name||"Untitled",y:String(m.releaseInfo||m.year||"").slice(0,4),d:m.description||"No description.",g:[...id].reduce((a,c)=>a+c.charCodeAt(0),0)%6,poster:/^https?:/.test(m.poster||"")?m.poster:""};
 CAT.push(o);META[id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]};S.extra.push(o);save();i=CAT.length-1}return i}
@@ -573,7 +585,7 @@ const el=$("#arows");if(!el||t!==loadRows.t)return;
 const ids=RC[k].slice(0,20).map(m=>adoptM(m,x.c.type));
 (FB.length<5&&ids.forEach((hi,n)=>{if(FB.length<5&&RC[k][n]&&RC[k][n].poster)FB.push({i:hi,bg:RC[k][n].poster,tag:x.c.name,ov:RC[k][n].description||""})})),RC[k].filter(m=>m.background).slice(0,3).forEach(m=>{const hi=ids[RC[k].indexOf(m)];if(hi!==undefined)spotAdd({i:hi,bg:m.background,tag:x.c.name,ov:m.description||""})});
 el.insertAdjacentHTML("beforeend",`<h2>${esc(x.c.name)} <small class="by">${esc(x.a.name)}</small></h2><div class="row">${ids.map(i=>card(i)).join("")}</div>`)}
-if(t===loadRows.t&&!SPOT.items.length)setTimeout(()=>{if(!SPOT.items.length)FB.forEach(spotAdd)},2500);const e1=$("#arows");if(e1&&t===loadRows.t){e1.style.minHeight="";KH=0}}
+await mdbRows(t);if(t===loadRows.t&&!SPOT.items.length)setTimeout(()=>{if(!SPOT.items.length)FB.forEach(spotAdd)},2500);const e1=$("#arows");if(e1&&t===loadRows.t){e1.style.minHeight="";KH=0}}
 function isTv(m){return m.type==="series"||(m.type==="tv"&&!!m.tid)}
 function isLive(m){return !m.tid&&["tv","channel","events","sports"].includes(m.type)}
 let EP={i:-1,s:1,e:1};const MC={};
@@ -731,7 +743,8 @@ return'<h2>Cast &amp; Crew</h2><div class="crow">'+list.map(p=>'<div class="cm">
 function moreHtml(i){const t=tm(i);if(!t||!t.rec||!t.rec.length)return"";
 return'<h2>More Like This</h2><div class="row">'+t.rec.map((r,n)=>{const g=GRAD[(r.id||n)%6];return'<button class="card" data-rec="'+n+'"><div class="poster" style="'+(r.poster_path?'background:url(https://image.tmdb.org/t/p/w342'+r.poster_path+') center/cover':'background:linear-gradient(160deg,'+g[0]+','+g[1]+')')+'">'+(r.poster_path?'':'<b>'+esc(r.title||r.name||"")+'</b>')+'</div><div class="meta">'+esc(String(r.release_date||r.first_air_date||"").slice(0,4))+'</div></button>'}).join("")+'</div>'}
 function detail(){
-const i=view,m=CAT[i],tv=isTv(m),live=isLive(m),d=dInfo(i),sv=S.watchlist.includes(i);initEp(i);
+const i=view;setTimeout(()=>mdbRatings(i),0);
+const m=CAT[i],tv=isTv(m),live=isLive(m),d=dInfo(i),sv=S.watchlist.includes(i);initEp(i);
 const key=m.id+"|"+EP.s+"|"+EP.e,done=tv?S.eps[key]:S.watched[m.id],rp=getPos(posKey(m,EP.s,EP.e)),resumed=rp>0||(tv?!!S.last[m.id]:(S.progress[i]>0.05&&!S.watched[m.id]));
 const label=(rp>0?"Resume":done?"Watch again":resumed?"Resume":"Play")+(tv?" S"+EP.s+":E"+EP.e:"")+(rp>0?" \u00b7 "+fmtT(rp):"");
 const bg=d.bg?"background-image:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,0) 28%,rgba(0,0,0,.6) 66%,var(--bg) 100%),url("+esc(d.bg)+")":grad(i);
@@ -741,7 +754,7 @@ const CL='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="10" width=
 const MK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>';
 return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria-label="Back">'+BK+'</button><div class="dtti">'+(d.logo?'<img class="dtlogo" alt="'+esc(m.t)+'" src="'+esc(d.logo)+'">':'<h1>'+esc(m.t)+'</h1>')+'</div>'
 +(d.genres.length&&!live?'<div class="dtgen">'+d.genres.slice(0,3).map(esc).join(" ")+'</div>':'')
-+'<div class="dtmeta">'+(live?'<span>Live</span>':'')+(d.year&&!live?'<span>'+esc(d.year)+'</span>':'')+(d.cert?'<span class="bx">'+esc(d.cert)+'</span>':'')+(d.rt?'<span>'+d.rt+'m</span>':'')+(d.rating?'<span class="bx">'+(+d.rating).toFixed(1)+'</span>':'')+'</div></div>'
++'<div class="dtmeta">'+(live?'<span>Live</span>':'')+(d.year&&!live?'<span>'+esc(d.year)+'</span>':'')+(d.cert?'<span class="bx">'+esc(d.cert)+'</span>':'')+(d.rt?'<span>'+d.rt+'m</span>':'')+(d.rating?'<span class="bx">'+(+d.rating).toFixed(1)+'</span>':'')+'</div><div id="mdr" class="dtmeta"></div></div>'
 +'<button class="playbig" data-watch><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg><span>'+label+'</span></button><div id="pl" class="pst" hidden></div>'
 +(S.addons.length?'':'<p class="meta" style="text-align:center;margin:10px 0 0">Install an addon and link a debrid account in Settings to start playing.</p>')
 +'<div class="dtacts"><button data-save>'+BM+'<span>'+(sv?"In Watchlist":"Add to Watchlist")+'</span></button>'+(live?'':'<button data-trailer>'+CL+'<span>Play Trailer</span></button>')+(tv||live?'':'<button data-mark>'+MK+'<span>'+(done?"Mark unwatched":"Mark watched")+'</span></button>')+'</div>'
@@ -764,6 +777,11 @@ ${(f=>f.length?`<label for="dp">Add a service</label><select id="dp">${f.map(p=>
 <p>Load posters, backdrops, cast, ratings and runtimes from The Movie Database.</p>
 <label for="tk">TMDB API key</label><input id="tk" type="password" autocomplete="off" value="${esc(S.tmdb.key)}" placeholder="Paste your API key">
 <button class="btn" data-link="tmdb">${S.tmdb.on?'Update':'Link TMDB'}</button> ${S.tmdb.on?'<button class="btn alt" data-unlink="tmdb">Unlink</button>':''}</div>
+<div class="panel"><h3>MDBList</h3><span class="status ${S.mdb.key?'on':''}">${S.mdb.key?'Linked':'Not linked'}</span>
+<p>Shows IMDb, Rotten Tomatoes, Metacritic and Letterboxd ratings on title pages, and lets you add MDBList lists as rows on Home.</p>
+<label for="mk">MDBList API key</label><input id="mk" type="password" autocomplete="off" value="${esc(S.mdb.key)}" placeholder="Paste your API key">
+<button class="btn" data-link="mdb">${S.mdb.key?'Update':'Link MDBList'}</button> ${S.mdb.key?'<button class="btn alt" data-unlink="mdb">Unlink</button>':''}
+${S.mdb.key?`<label for="ml">Add a list</label><input id="ml" placeholder="https://mdblist.com/lists/username/list-name" inputmode="url"><button class="btn" data-mdbadd>Add list</button>${S.mdb.lists.map((l,n)=>`<div class="src"><div><b>${esc(l.name)}</b><small>${esc(l.u)}</small></div><button class="btn alt" style="margin:0;padding:8px 12px" data-mdbrm="${n}">Remove</button></div>`).join("")}`:''}</div>
 <div class="panel"><h3>Addons</h3><p>Paste the manifest URL of an addon you want to install. Ski Media uses the Stremio addon format.</p>
 <input id="ad" placeholder="https://example.com/manifest.json" inputmode="url">
 <button class="btn" data-addon>Install addon</button>
@@ -812,11 +830,12 @@ if(S.watched[id]){delete S.watched[id];queue("unwatch:"+id)}else{S.watched[id]=1
 if(d.watch!==undefined&&S.addons.length){playBest(view);return}
 if(d.watch!==undefined){toast("Install an addon in Settings to find something to play");return}
 if(d.link){
+if(d.link==="mdb"){const v=$("#mk").value.trim();if(!v){toast("Paste your MDBList API key first");return}S.mdb.key=v;save();render();toast("MDBList linked");return}
 if(d.link==="tmdb"){const v=$("#tk").value.trim();if(!v){toast("Paste your TMDB API key first");return}S.tmdb={on:true,key:v};toast("TMDB linked")}
 else if(d.link==="simkl"){const v=$("#sk").value.trim();if(!v){toast("Paste your Simkl token first");return}S.simkl.token=v;S.simkl.on=true;S.simkl.scrobble=$("#sc").checked;toast("Simkl linked")}
 else{const v=$("#dt").value.trim();if(!v){toast("Paste your API token first");return}S.debrids.push({prov:$("#dp").value,token:v});toast($("#dp").value+" linked")}
 save();render();return}
-if(d.unlink){if(d.unlink==="tmdb"){S.tmdb={on:false,key:""}}else if(d.unlink==="simkl"){S.simkl={on:false,token:"",scrobble:true,cid:S.simkl.cid};S.queue=[]}else S.debrid={on:false,prov:"Real-Debrid",token:""};save();render();toast("Unlinked");return}
+if(d.unlink){if(d.unlink==="mdb"){S.mdb={key:"",lists:[]};save();render();toast("Unlinked");return}if(d.unlink==="tmdb"){S.tmdb={on:false,key:""}}else if(d.unlink==="simkl"){S.simkl={on:false,token:"",scrobble:true,cid:S.simkl.cid};S.queue=[]}else S.debrid={on:false,prov:"Real-Debrid",token:""};save();render();toast("Unlinked");return}
 if(d.refresh!==undefined){Object.keys(TM).forEach(k=>delete TM[k]);Object.keys(RC).forEach(k=>delete RC[k]);SPOT.items=[];SPOT.tm=0;SPOT.idx=0;if(S.simkl.on)doSync(true);save();render();if(view!==null)loadTmdb(view);toast(S.simkl.on?"Refreshed and synced Simkl":"Refreshed");return}
 if(d.rs!==undefined){startPlay(STR[+d.rs],view);return}
 if(d.skpin!==undefined){const c=$("#skid").value.trim();if(!c){toast("Paste your Simkl client ID first");return}S.simkl.cid=c;save();startPin(c);return}
@@ -829,6 +848,9 @@ if(d.rclear!==undefined){S.recent=[];save();show();return}
 if(d.vlc!==undefined){openVlc(LAST.url,LAST.title).catch(()=>toast("Couldn't open VLC"));return}
 if(d.inapp!==undefined){mountPlayer($("#pl"),{orig:LAST.url,tc:"",info:LAST.info,prov:LAST.prov},LAST.vi);return}
 if(d.copy!==undefined){(navigator.clipboard?navigator.clipboard.writeText(LAST.url):Promise.reject()).then(()=>toast("Link copied")).catch(()=>toast("Couldn't copy the link"));return}
+if(d.mdbadd!==undefined){const v=($("#ml").value||"").trim(),mm=v.match(/mdblist\.com\/lists\/([^\/\s?#]+)\/([^\/\s?#]+)/i);if(!mm){toast("Paste a list link like mdblist.com/lists/username/list-name");return}
+S.mdb.lists.push({u:mm[1],s:mm[2],name:mm[2].replace(/-/g," ")});save();render();toast("List added. It shows on Home");return}
+if(d.mdbrm!==undefined){S.mdb.lists.splice(+d.mdbrm,1);save();render();return}
 if(d.rmdeb!==undefined){S.debrids.splice(+d.rmdeb,1);save();render();toast("Service removed");return}
 if(d.top!==undefined){const a=S.debrids.splice(+d.top,1);S.debrids.unshift(a[0]);save();render();toast("Primary service updated");return}
 if(d.addon!==undefined){const v=$("#ad").value.trim().replace(/^stremio:\/\//,"https://");if(!/^https?:\/\/.+manifest\.json$/i.test(v)){toast("Enter a full manifest.json URL");return}toast("Installing...");Ski.addon(v).then(a=>{S.addons.push(a);save();render();toast(a.name+" installed")}).catch(()=>toast("Couldn't load that addon"));return}
