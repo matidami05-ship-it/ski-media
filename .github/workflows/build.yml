@@ -1218,7 +1218,7 @@ jobs:
           npx cap sync android
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --console=plain > ../gradle2.log 2>&1 || { echo "::error::GRADLE2 FAILED: $(grep -E 'error:|error |FAILED|What went wrong|Could not|Execution failed|Caused by|not found|Failed' ../gradle2.log | head -30 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle2.log | sed 's/^/LOG: /'; exit 1; } --console=plain > ../gradle1.log 2>&1 || { echo "::error::GRADLE1 FAILED: $(grep -E 'error:|error |FAILED|What went wrong|Could not|Execution failed|Caused by|not found|Failed' ../gradle1.log | head -30 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle1.log | sed 's/^/LOG: /'; exit 1; }
+          ./gradlew assembleDebug --console=plain > ../gradle1.log 2>&1 || { echo "::error::GRADLE1 FAILED: $(grep -E 'error:|error |FAILED|What went wrong|Could not|Execution failed|Caused by|not found|Failed' ../gradle1.log | head -30 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle1.log | sed 's/^/LOG: /'; exit 1; } --console=plain > ../gradle1.log 2>&1 || { echo "::error::GRADLE1 FAILED: $(grep -E 'error:|error |FAILED|What went wrong|Could not|Execution failed|Caused by|not found|Failed' ../gradle1.log | head -30 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle1.log | sed 's/^/LOG: /'; exit 1; }
           cd ..
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk out/ski-media.apk
@@ -1244,7 +1244,7 @@ jobs:
           grep -c "__SKI_FORCE_TV" www/index.html
           npx cap sync android
           cd android
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --console=plain > ../gradle2b.log 2>&1 || { echo "::error::GRADLE-TV FAILED: $(grep -E 'error:|error |FAILED|What went wrong|Could not|Execution failed|Caused by|not found|Failed' ../gradle2b.log | head -30 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle2b.log | sed 's/^/LOG: /'; exit 1; } --console=plain > ../gradle1.log 2>&1 || { echo "::error::GRADLE1 FAILED: $(grep -E 'error:|error |FAILED|What went wrong|Could not|Execution failed|Caused by|not found|Failed' ../gradle1.log | head -30 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle1.log | sed 's/^/LOG: /'; exit 1; }
           cd ..
           cp android/app/build/outputs/apk/debug/app-debug.apk out/ski-media-tv.apk
       - uses: actions/upload-artifact@v4
