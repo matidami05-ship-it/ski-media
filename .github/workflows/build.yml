@@ -1218,7 +1218,7 @@ jobs:
           npx cap sync android
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --console=plain > ../gradle1.log 2>&1 || { echo "::error::GRADLE1 FAILED: $(grep -E 'error:|error |FAILED|What went wrong|Could not|Execution failed|Caused by|not found|Failed' ../gradle1.log | head -30 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle1.log | sed 's/^/LOG: /'; exit 1; }
+          ./gradlew assembleDebug --console=plain > ../gradle1.log 2>&1 || { echo "::error::GRADLE1 FAILED: $(grep -E -A14 'What went wrong' ../gradle1.log | head -40 | tr '\n' '|' | cut -c1-3500)"; tail -n 25 ../gradle1.log | sed 's/^/LOG: /'; exit 1; }
           cd ..
           mkdir -p out
           cp android/app/build/outputs/apk/debug/app-debug.apk out/ski-media.apk
