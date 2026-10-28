@@ -1255,6 +1255,7 @@ jobs:
                   info.addView(badges);
                   top.addView(info, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
                   clockText = label("", 22, Color.WHITE, true);
+          clockText.setGravity(Gravity.END);
                   top.addView(clockText);
                   overlay.addView(top, new FrameLayout.LayoutParams(
                       FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP));
@@ -1455,8 +1456,14 @@ jobs:
 
               private void updateProgress() {
                   if (player == null) return;
-                  clockText.setText(clockFmt.format(new Date()));
                   long d = player.getDuration();
+          String clk = clockFmt.format(new Date());
+          if (d > 0) {
+              float spd = Math.max(0.25f, player.getPlaybackParameters().speed);
+              long left = (long) ((d - player.getCurrentPosition()) / spd);
+              clk += "\nEnds " + clockFmt.format(new Date(System.currentTimeMillis() + Math.max(0, left)));
+          }
+          clockText.setText(clk);
                   long p = player.getCurrentPosition();
                   if (!dragging) {
                       posText.setText(fmt(p));
