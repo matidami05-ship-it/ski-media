@@ -355,16 +355,25 @@ function recentHtml(){if(!S.recent.length)return"";return `<div style="display:f
 function hits(q){q=q.trim().toLowerCase();if(!q)return[];return CAT.map((m,i)=>i).filter(i=>{const m=CAT[i],x=META[m.id];return[m.t,m.y,x.dir,x.cast.join(" "),x.gen.join(" ")].join(" ").toLowerCase().includes(q)})}
 function results(){const q=Q.trim();if(!q)return `<p class="meta">Search by title, year, director, actor or genre.</p>${recentHtml()}<h2>Browse all</h2><div class="grid">${CAT.map((m,i)=>i).filter(i=>!CAT[i].tid).map(i=>card(i)).join("")}</div>`;
 const h=hits(Q).filter(i=>!CAT[i].tid);let out=h.length?`<h2>In your catalog</h2><div class="grid">${h.map(i=>card(i)).join("")}</div>`:"";
-if(0){}else if(TS==="loading")out+=`<p class="meta">Searching TMDB...</p>`;
-else if(TS==="error")out+=`<div class="panel" style="margin-top:16px"><h3>Can't reach TMDB</h3><p>The search request failed. Check that your API key is correct and that you're online. Previews hosted on claude.ai also block requests to other sites.</p></div>`;
-else if(TS==="done")out+=TR.length?`<h2>From TMDB</h2><div class="grid">${TR.map(i=>card(i)).join("")}</div>`:`<p class="meta">TMDB has no matches for "${esc(Q)}".</p>`;
+if(0){}else if(TS==="loading")out+=`<p class="meta">Searching your addons...</p>`;
+else if(TS==="error")out+=`<div class="panel" style="margin-top:16px"><h3>Search failed</h3><p>Couldn't search your addons. Check that you're online.</p></div>`;
+else if(TS==="done")out+=TR.length?`<h2>From your addons</h2><div class="grid">${TR.map(i=>card(i)).join("")}</div>`:`<p class="meta">Your addons have no matches for "${esc(Q)}".</p>`;
 return out||`<p class="meta">No matches for "${esc(Q)}". Try a title, actor or genre.</p>`}
 let TR=[],TS="idle",st;
 function show(){const r=$("#res");if(r)r.innerHTML=results()}
 function pbg(i){const m=CAT[i];return m.poster?`background:url(${m.poster}) ${isLive(m)?"center/contain no-repeat":"center/cover"},${grad(i).slice(11)}`:grad(i)}
 function adopt(x){const tv=x.media_type==="tv",id="tmdb"+(tv?"tv":"m")+x.id;let i=CAT.findIndex(m=>m.id===id);if(i<0){const o={id,tid:x.id,type:tv?"series":"movie",t:x.title||x.name||"Untitled",y:+((x.release_date||x.first_air_date||"").slice(0,4))||"",d:x.overview||"No overview yet.",g:x.id%6,poster:x.poster_path?"https://image.tmdb.org/t/p/w342"+x.poster_path:""};CAT.push(o);META[id]={r:x.vote_average||0,rt:0,gen:[],dir:"Unknown",cast:[]};S.extra.push(o);save();i=CAT.length-1}return i}
-function tsearch(q){clearTimeout(st);TR=[];const t=q.trim();if(!S.tmdb.on||t.length<2){TS="idle";show();return}TS="loading";show();
-st=setTimeout(async()=>{try{const r=await(await fetch(`https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(t)}&include_adult=false&api_key=${encodeURIComponent(S.tmdb.key)}`)).json();if(q!==Q)return;if(!r.results)throw 0;TR=r.results.filter(x=>x.media_type==="movie"||x.media_type==="tv").slice(0,18).map(adopt);TS="done"}catch(e){if(q!==Q)return;TS="error"}show()},350)}
+const SMF={};
+async function addonSearch(q){const seen=new Set(),out=[];
+await Promise.all(S.addons.map(async a=>{try{
+const mf=SMF[a.url]=SMF[a.url]||await Ski.j(a.url+"/manifest.json");
+const cats=(mf.catalogs||[]).filter(c=>(c.type==="movie"||c.type==="series")&&((c.extra||[]).some(e=>e.name==="search")||(c.extraSupported||[]).includes("search"))&&!(c.extra||[]).some(e=>e.isRequired&&e.name!=="search")&&!(c.extraRequired||[]).some(n=>n!=="search"));
+await Promise.all(cats.slice(0,4).map(async c=>{try{
+const r=await Promise.race([Ski.j(a.url+"/catalog/"+c.type+"/"+encodeURIComponent(c.id)+"/search="+encodeURIComponent(q)+".json"),new Promise((_,j)=>setTimeout(()=>j(0),7000))]);
+(r.metas||[]).slice(0,20).forEach(m=>{if(!m||!m.id)return;const k=c.type+m.id;if(seen.has(k))return;seen.add(k);out.push({m,t:c.type})})}catch(e){}}))}catch(e){}}));
+return out}
+function tsearch(q){clearTimeout(st);TR=[];const t=q.trim();if(!S.addons.length||t.length<2){TS="idle";show();return}TS="loading";show();
+st=setTimeout(async()=>{try{const r=await addonSearch(t);if(q!==Q)return;TR=r.slice(0,36).map(x=>adoptM(x.m,x.t));TS="done"}catch(e){if(q!==Q)return;TS="error"}show()},400)}
 function skIds(m){const x=m.aid||m.id;if(/^tt\d+$/.test(x))return{imdb:x};if(m.tid)return{tmdb:m.tid};return null}
 async function pushQ(){if(!S.simkl.on||!S.simkl.cid||!S.queue.length)return;
 const q=S.queue.slice(),E=()=>({movies:[],shows:[]}),H=E(),A=E(),R=E();
