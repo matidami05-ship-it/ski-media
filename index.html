@@ -762,6 +762,10 @@ if(!epList(i).length){await tmdbEps(i);fill=1}}catch(e){}
 EPF[m.id]=2;if(view!==i||!fill)return;
 if(epList(i).length&&!S.last[m.id]&&EP.i===i){const l=epList(i);EP.s=l[0].season;EP.e=l[0].episode}
 softRender()}
+window.__skiInstall=function(u){try{u=String(u||"").trim().replace(/^stremio:\/\//i,"https://");if(!/^https?:\/\/.+manifest\.json/i.test(u)){toast("That isn't an addon link");return}
+if(window.__skiLast===u&&Date.now()-(window.__skiLastT||0)<20000)return;window.__skiLast=u;window.__skiLastT=Date.now();window.__skiPendingUrl=null;
+toast("Installing addon...");Ski.addon(u).then(a=>{if(S.addons.some(x=>x.url===a.url)){toast(a.name+" is already installed");return}S.addons.push(a);save();render();toast(a.name+" installed")}).catch(()=>toast("Couldn't load that addon"))}catch(e){}};
+if(window.__skiPendingUrl)setTimeout(()=>window.__skiInstall(window.__skiPendingUrl),800);
 const AEP={};
 async function addonEps(i){const m=CAT[i];if(!isTv(m)||AEP[m.id]||epList(i).length)return;AEP[m.id]=1;
 const cm="https://v3-cinemeta.strem.io";let imdb="",vids=[];const oid=m.aid||m.id;

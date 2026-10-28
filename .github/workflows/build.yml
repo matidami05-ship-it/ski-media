@@ -1747,13 +1747,37 @@ jobs:
           cat > $JAVA_DIR/MainActivity.java <<'JAVA'
           package com.skimedia.app;
 
+          import android.content.Intent;
           import android.os.Bundle;
+          import android.os.Handler;
+          import android.os.Looper;
+          import org.json.JSONObject;
           import android.widget.Toast;
           import androidx.activity.OnBackPressedCallback;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
               private long lastBack = 0;
+              private void handleLink(Intent intent) {
+                  if (intent == null || intent.getData() == null) return;
+                  final String url = intent.getData().toString();
+                  if (!url.toLowerCase().startsWith("stremio:")) return;
+                  final String js = "(function(u){if(window.__skiInstall)window.__skiInstall(u);else window.__skiPendingUrl=u})(" + JSONObject.quote(url) + ")";
+                  Handler h = new Handler(Looper.getMainLooper());
+                  int[] delays = {400, 1800, 4500};
+                  for (int d : delays) {
+                      h.postDelayed(() -> {
+                          if (getBridge() != null && getBridge().getWebView() != null) getBridge().getWebView().evaluateJavascript(js, null);
+                      }, d);
+                  }
+              }
+
+              @Override
+              protected void onNewIntent(Intent intent) {
+                  super.onNewIntent(intent);
+                  handleLink(intent);
+              }
+
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   registerPlugin(VlcPlugin.class);
@@ -1777,6 +1801,7 @@ jobs:
                               });
                       }
                   });
+                  handleLink(getIntent());
               }
           }
           JAVA
@@ -1793,6 +1818,10 @@ jobs:
           # 2) player activity in the manifest
           p = "android/app/src/main/AndroidManifest.xml"
           m = open(p, encoding="utf-8").read()
+          if 'android:scheme="stremio"' not in m:
+              flt = '        <intent-filter>\n            <action android:name="android.intent.action.VIEW" />\n            <category android:name="android.intent.category.DEFAULT" />\n            <category android:name="android.intent.category.BROWSABLE" />\n            <data android:scheme="stremio" />\n        </intent-filter>\n    </activity>'
+              m = m.replace("</activity>", flt, 1)
+              open(p, "w", encoding="utf-8").write(m)
           if "SkiPlayerActivity" not in m:
               act = '    <activity android:name=".SkiPlayerActivity" android:exported="false" android:theme="@style/SkiPlayerTheme" android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout|uiMode|density" />\n    </application>'
               m = m.replace("</application>", act, 1)
