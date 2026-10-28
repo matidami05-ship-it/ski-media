@@ -51,7 +51,8 @@ input,select{width:100%;padding:11px;border-radius:8px;border:1px solid var(--li
 .src{display:flex;align-items:center;gap:10px;padding:12px 0;border-top:1px solid var(--line)}
 .src:first-child{border-top:0}
 .src div{flex:1;min-width:0}
-.src small{color:var(--mute);display:block}
+.src small{color:var(--mute);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+#app,.panel{overflow-wrap:anywhere}
 .chip{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700}
 .cached{background:var(--ok);color:#06241a}
 .direct{background:var(--blue);color:#fff}
@@ -824,7 +825,7 @@ return `<h2>Settings</h2><div class="panel"><h3>Player</h3><p>Where videos open 
 <div class="panel"><h3>Addons</h3><p>Paste the manifest URL of an addon you want to install. Ski Media uses the Stremio addon format.</p>
 <input id="ad" placeholder="https://example.com/manifest.json" inputmode="url">
 <button class="btn" data-addon>Install addon</button>
-${S.addons.map((a,n)=>`<div class="src"><div><b>${esc(a.name||a)}</b><small>${esc(a.url||"")}</small></div><button class="btn alt" style="margin:0;padding:8px 12px" data-rm="${n}">Remove</button></div>`).join("")}</div>
+${S.addons.map((a,n)=>`<div class="src"><div><b>${esc(a.name||a)}</b><small>${esc((()=>{try{return new URL(a.url).host}catch(e){return""}})())}</small></div><button class="btn alt" style="margin:0;padding:8px 12px;flex:none" data-rm="${n}">Remove</button></div>`).join("")}</div>
 <div class="panel"><h3>IPTV</h3><p>Add a live TV playlist: an M3U link, or an Xtream Codes login from your provider.</p>
 <select id="itype"><option value="m3u">M3U playlist URL</option><option value="xt">Xtream Codes login</option></select>
 <input id="iname" placeholder="Name (optional)" style="margin-top:8px">
