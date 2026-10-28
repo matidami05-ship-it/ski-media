@@ -332,7 +332,7 @@ const PROVIDERS=["Real-Debrid","AllDebrid","Premiumize","TorBox","Debrid-Link"];
 let S;
 try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
-S.tmdb=S.tmdb||{on:false,key:""};S.mdb={key:"",lists:[]};S.tmdb={on:false,key:""};S.hideCloud=true;S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
+S.tmdb=S.tmdb||{on:false,key:""};S.mdb={key:"",lists:[]};S.hideCloud=true;S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
 S.debrids=[];
 S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.teams=S.teams||[];S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
@@ -357,7 +357,7 @@ function results(){const q=Q.trim();if(!q)return `<p class="meta">Search by titl
 const h=hits(Q).filter(i=>!CAT[i].tid);let out=h.length?`<h2>In your catalog</h2><div class="grid">${h.map(i=>card(i)).join("")}</div>`:"";
 if(0){}else if(TS==="loading")out+=`<p class="meta">Searching your addons...</p>`;
 else if(TS==="error")out+=`<div class="panel" style="margin-top:16px"><h3>Search failed</h3><p>Couldn't search your addons. Check that you're online.</p></div>`;
-else if(TS==="done")out+=TR.length?`<h2>From your addons</h2><div class="grid">${TR.map(i=>card(i)).join("")}</div>`:`<p class="meta">Your addons have no matches for "${esc(Q)}".</p>`;
+else if(TS==="done")out+=TR.length?`<h2>Results</h2><div class="grid">${TR.map(i=>card(i)).join("")}</div>`:`<p class="meta">Nothing matches "${esc(Q)}".</p>`;
 return out||`<p class="meta">No matches for "${esc(Q)}". Try a title, actor or genre.</p>`}
 let TR=[],TS="idle",st;
 function show(){const r=$("#res");if(r)r.innerHTML=results()}
@@ -372,8 +372,10 @@ await Promise.all(cats.slice(0,4).map(async c=>{try{
 const r=await Promise.race([Ski.j(a.url+"/catalog/"+c.type+"/"+encodeURIComponent(c.id)+"/search="+encodeURIComponent(q)+".json"),new Promise((_,j)=>setTimeout(()=>j(0),7000))]);
 (r.metas||[]).slice(0,20).forEach(m=>{if(!m||!m.id)return;const k=c.type+m.id;if(seen.has(k))return;seen.add(k);out.push({m,t:c.type})})}catch(e){}}))}catch(e){}}));
 return out}
-function tsearch(q){clearTimeout(st);TR=[];const t=q.trim();if(!S.addons.length||t.length<2){TS="idle";show();return}TS="loading";show();
-st=setTimeout(async()=>{try{const r=await addonSearch(t);if(q!==Q)return;TR=r.slice(0,36).map(x=>adoptM(x.m,x.t));TS="done"}catch(e){if(q!==Q)return;TS="error"}show()},400)}
+function tsearch(q){clearTimeout(st);TR=[];const t=q.trim();if((!S.addons.length&&!S.tmdb.on)||t.length<2){TS="idle";show();return}TS="loading";show();
+st=setTimeout(async()=>{try{const [ad,tm]=await Promise.all([S.addons.length?addonSearch(t).catch(()=>[]):[],S.tmdb.on?fetch(`https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(t)}&include_adult=false&api_key=${encodeURIComponent(S.tmdb.key)}`).then(r=>r.json()).then(r=>r.results||[]).catch(()=>[]):[]]);
+if(q!==Q)return;const a=ad.slice(0,36).map(x=>adoptM(x.m,x.t));const b=tm.filter(x=>x.media_type==="movie"||x.media_type==="tv").slice(0,18).map(adopt);
+TR=a.concat(b.filter(i=>!a.includes(i)));TS="done"}catch(e){if(q!==Q)return;TS="error"}show()},400)}
 function skIds(m){const x=m.aid||m.id;if(/^tt\d+$/.test(x))return{imdb:x};if(m.tid)return{tmdb:m.tid};return null}
 async function pushQ(){if(!S.simkl.on||!S.simkl.cid||!S.queue.length)return;
 const q=S.queue.slice(),E=()=>({movies:[],shows:[]}),H=E(),A=E(),R=E();
@@ -800,6 +802,10 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 function settings(){
 return `<h2>Settings</h2><div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
 <div class="panel"><h3>TV mode</h3><p>Layout for Android TV and other remote-control screens. Auto turns it on when there is no touchscreen.</p><label for="tvm">TV mode</label><select id="tvm"><option value="auto" ${(S.tvmode||"auto")==="auto"?"selected":""}>Auto</option><option value="on" ${S.tvmode==="on"?"selected":""}>On</option><option value="off" ${S.tvmode==="off"?"selected":""}>Off</option></select></div>
+<div class="panel"><h3>TMDB</h3><span class="status ${S.tmdb.on?'on':''}">${S.tmdb.on?'Linked':'Not linked'}</span>
+<p>Load posters, backdrops, cast, ratings and runtimes from The Movie Database.</p>
+<label for="tk">TMDB API key</label><input id="tk" type="password" autocomplete="off" value="${esc(S.tmdb.key)}" placeholder="Paste your API key">
+<button class="btn" data-link="tmdb">${S.tmdb.on?'Update':'Link TMDB'}</button> ${S.tmdb.on?'<button class="btn alt" data-unlink="tmdb">Unlink</button>':''}</div>
 <div class="panel"><h3>Addons</h3><p>Paste the manifest URL of an addon you want to install. Ski Media uses the Stremio addon format.</p>
 <input id="ad" placeholder="https://example.com/manifest.json" inputmode="url">
 <button class="btn" data-addon>Install addon</button>
