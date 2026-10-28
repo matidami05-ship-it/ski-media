@@ -30,6 +30,8 @@ h2{font-size:19px;margin:22px 0 10px}
 .meta{font-size:12px;color:var(--mute);margin-top:5px}
 .bar{height:4px;background:var(--line);border-radius:2px;margin-top:6px}
 .bar i{display:block;height:100%;background:var(--red);border-radius:2px}
+.newep{position:absolute;top:8px;right:8px;z-index:3;background:linear-gradient(135deg,#ff4d5a,#ff8a5b);color:#fff;border-radius:8px;font-size:10px;padding:2px 7px;font-weight:800;letter-spacing:.3px;box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.tkp{margin:12px 0 0;padding:12px 14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}.tkp b{display:block;font-size:14px}.tkp small{color:var(--mute)}.tkp .bar{height:6px;margin-top:8px}
 .tick{position:absolute;top:8px;right:8px;z-index:2;background:var(--ok);color:#06241a;border-radius:10px;font-size:11px;padding:1px 7px;font-weight:700}
 nav{flex:none;position:relative;z-index:5;background:var(--panel);border-top:1px solid var(--line);display:flex;padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
 nav button{flex:1;background:none;border:0;color:var(--mute);font:inherit;font-size:12px;padding:8px 0;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 0}nav button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
@@ -344,8 +346,11 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("show"),2200)}
 function grad(i){const g=GRAD[CAT[i].g];return `background:linear-gradient(160deg,${g[0]},${g[1]})`}
-function card(i,showBar){const m=CAT[i];
-return `<button class="card" data-open="${i}"><div class="poster" style="${pbg(i)}">${S.watched[m.id]?'<span class="tick">Watched</span>':''}${m.poster?"":`<b>${esc(m.t)}</b>`}</div><div class="ct">${esc(m.t)}</div><div class="meta">${m.y}</div>${showBar?`<div class="bar"><i style="width:${(S.progress[i]||0)*100}%"></i></div>`:''}</button>`}
+function fmtLeft(s){s=Math.max(0,Math.round(s));const m=Math.round(s/60);return m>=60?Math.floor(m/60)+"h "+(m%60)+"m":Math.max(1,m)+"m"}
+const NEWEP={};
+function bestPos(i){const m=CAT[i];let b=null;Object.keys(S.pos).forEach(k=>{const p=S.pos[k];if(p&&p.id===m.id&&p.t>10&&(!b||p.ts>b.ts))b=p});return b}
+function card(i,showBar){const m=CAT[i],bp=(S.progress[i]>0&&!S.watched[m.id])||showBar?bestPos(i):null,ne=NEWEP[m.id];
+return `<button class="card" data-open="${i}"><div class="poster" style="${pbg(i)}">${S.watched[m.id]?'<span class="tick">Watched</span>':ne?'<span class="newep">NEW EP</span>':''}${m.poster?"":`<b>${esc(m.t)}</b>`}</div><div class="ct">${esc(m.t)}</div><div class="meta">${bp&&bp.d>0?(isTv(m)?"S"+bp.s+":E"+bp.e+" \u00b7 ":"")+fmtLeft(bp.d-bp.t)+" left":ne?"S"+ne.s+":E"+ne.e+" is out":m.y}</div>${(showBar||(S.progress[i]>0&&!S.watched[m.id]))?`<div class="bar"><i style="width:${(S.progress[i]||0)*100}%"></i></div>`:''}</button>`}
 
 function home(){
 const cont=contList();
@@ -741,13 +746,30 @@ desc:t.ov||mt.description||m.d||"",cast:tc.length?tc:(mt.cast||x.cast||[]),trail
 function initEp(i){if(EP.i===i)return;const m=CAT[i];if(!isTv(m)){EP={i,s:1,e:1};return}const l=epList(i),L=S.last[m.id];
 if(L)EP={i,s:L.s,e:L.e};else if(l.length)EP={i,s:l[0].season,e:l[0].episode};else EP={i,s:1,e:1}}
 const CK='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
+function progHtml(i){const m=CAT[i],tv=isTv(m);
+if(tv){const l=epList(i);const rp=S.pos[posKey(m,EP.s,EP.e)];let out="";
+if(rp&&rp.d>0)out+='<b>S'+EP.s+':E'+EP.e+' \u00b7 '+fmtT(rp.t)+' of '+fmtT(rp.d)+'</b><small>'+fmtLeft(rp.d-rp.t)+' left</small><div class="bar"><i style="width:'+Math.min(100,rp.t/rp.d*100)+'%"></i></div>';
+if(l.length){const w=l.filter(x=>S.eps[m.id+"|"+x.season+"|"+x.episode]).length;if(w||rp)out+=(out?'<div style="height:10px"></div>':'')+'<b>'+w+' of '+l.length+' episodes watched</b><div class="bar"><i style="width:'+(w/l.length*100)+'%"></i></div>'}
+return out?'<div class="tkp">'+out+'</div>':""}
+const rp=S.pos[posKey(m,0,0)];if(rp&&rp.d>0)return'<div class="tkp"><b>Resume at '+fmtT(rp.t)+' of '+fmtT(rp.d)+'</b><small>'+fmtLeft(rp.d-rp.t)+' left</small><div class="bar"><i style="width:'+Math.min(100,rp.t/rp.d*100)+'%"></i></div></div>';
+return S.watched[m.id]?'<div class="tkp"><b>Watched</b></div>':""}
+async function scanNew(){S.ne=S.ne||{};const now=Date.now(),ids=new Set();let changed=false;
+S.watchlist.forEach(i=>ids.add(i));Object.keys(S.last||{}).forEach(id=>{const i=CAT.findIndex(c=>c.id===id);if(i>=0)ids.add(i)});Object.keys(S.pos).forEach(k=>{const p=S.pos[k];const i=p&&CAT.findIndex(c=>c.id===p.id);if(i>=0)ids.add(i)});
+const list=[...ids].filter(i=>CAT[i]&&isTv(CAT[i])).slice(0,25);
+for(const i of list){const m=CAT[i],id=m.aid||m.id;let c=S.ne[m.id];
+if(!c||now-c.ts>6*3600e3){let v=epList(i);if(!v.length&&/^tt\d+$/.test(id)){try{v=((await Ski.j("https://v3-cinemeta.strem.io/meta/series/"+id+".json")).meta||{}).videos||[]}catch(e){continue}}
+const rel=v.filter(x=>x.season>0&&x.episode>0&&(x.released||x.firstAired)).map(x=>({s:x.season,e:x.episode,t:Date.parse(x.released||x.firstAired)})).filter(x=>x.t&&x.t<=now).sort((a,b)=>b.t-a.t)[0];
+c=S.ne[m.id]=rel?{ts:now,s:rel.s,e:rel.e,t:rel.t}:{ts:now};changed=true}
+const fresh=c.t&&now-c.t<21*864e5&&!S.eps[m.id+"|"+c.s+"|"+c.e]&&!S.watched[m.id];
+if(fresh){if(!NEWEP[m.id]){NEWEP[m.id]={s:c.s,e:c.e};changed=true}}else if(NEWEP[m.id]){delete NEWEP[m.id];changed=true}}
+if(changed){save();if(view===null&&(S.tab==="home"||S.tab==="lib")&&!document.querySelector("input:focus"))render()}}
 function episodesHtml(i){const m=CAT[i],id=m.aid||m.id,l=epList(i);
 if(!l.length){if(EPF[m.id]===1||(!(id in MT)&&/^tt\d+$/.test(id)))return'<h2>Episodes</h2><p class="meta">Loading episodes...</p>';
 return'<h2>Episodes</h2><p class="meta">No episode list found. Enter the episode to play.</p><div style="display:flex;gap:8px"><input id="sn" type="number" min="1" value="'+EP.s+'" aria-label="Season"><input id="en" type="number" min="1" value="'+EP.e+'" aria-label="Episode"></div>'}
 const ss=[...new Set(l.map(x=>x.season))].sort((a,b)=>a-b),vs=ss.includes(EP.vs)?EP.vs:(ss.includes(EP.s)?EP.s:ss[0]);
 return'<select class="seasel" id="sv" aria-label="Season">'+ss.map(n=>'<option value="'+n+'"'+(n===vs?" selected":"")+'>Season '+n+'</option>').join("")+'</select><div class="eps">'
 +l.filter(x=>x.season===vs).map(x=>{const k=m.id+"|"+x.season+"|"+x.episode,w=S.eps[k],ref=x.season+":"+x.episode;
-return'<div class="ep" tabindex="0" role="button" data-ep="'+ref+'"><div class="epth"'+(x.thumbnail?' style="background-image:url('+esc(x.thumbnail)+')"':"")+'><b>'+x.episode+'</b><button class="epck'+(w?" on":"")+'" data-epw="'+ref+'" aria-label="Toggle watched">'+CK+'</button></div><div class="epti"><b>'+esc(x.title||x.name||"Episode "+x.episode)+'</b><small>'+esc(fmtDate(x.released||x.firstAired))+'</small></div>'+(S.pos[k]&&S.pos[k].d>0?'<i class="epb"><u style="width:'+Math.min(100,Math.round(S.pos[k].t/S.pos[k].d*100))+'%"></u></i>':"")+'<p class="epov">'+esc(x.overview||x.description||"")+'</p></div>'}).join("")+'</div>'}
+return'<div class="ep" tabindex="0" role="button" data-ep="'+ref+'"><div class="epth"'+(x.thumbnail?' style="background-image:url('+esc(x.thumbnail)+')"':"")+'><b>'+x.episode+'</b><button class="epck'+(w?" on":"")+'" data-epw="'+ref+'" aria-label="Toggle watched">'+CK+'</button></div><div class="epti"><b>'+esc(x.title||x.name||"Episode "+x.episode)+'</b><small>'+esc(fmtDate(x.released||x.firstAired))+(S.pos[k]&&S.pos[k].d>0?" \u00b7 "+fmtLeft(S.pos[k].d-S.pos[k].t)+" left":w?" \u00b7 Watched":"")+(NEWEP[m.id]&&NEWEP[m.id].s===x.season&&NEWEP[m.id].e===x.episode?" \u00b7 NEW":"")+'</small></div>'+(S.pos[k]&&S.pos[k].d>0?'<i class="epb"><u style="width:'+Math.min(100,Math.round(S.pos[k].t/S.pos[k].d*100))+'%"></u></i>':"")+'<p class="epov">'+esc(x.overview||x.description||"")+'</p></div>'}).join("")+'</div>'}
 let SL={k:"",p:null};
 function loadStreams(){const k=view+"|"+EP.s+"|"+EP.e;if(SL.p&&SL.k===k)return SL.p;SL.k=k;const p=_loadStreams();SL.p=p;p.finally(()=>{if(SL.p===p)SL.p=null});return p}
 const EPF={};
@@ -816,7 +838,7 @@ const MK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-widt
 return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria-label="Back">'+BK+'</button><div class="dtti">'+(d.logo?'<img class="dtlogo" alt="'+esc(m.t)+'" src="'+esc(d.logo)+'">':'<h1>'+esc(m.t)+'</h1>')+'</div>'
 +(d.genres.length&&!live?'<div class="dtgen">'+d.genres.slice(0,3).map(esc).join(" ")+'</div>':'')
 +'<div class="dtmeta">'+(live?'<span>Live</span>':'')+(d.year&&!live?'<span>'+esc(d.year)+'</span>':'')+(d.cert?'<span class="bx">'+esc(d.cert)+'</span>':'')+(d.rt?'<span>'+d.rt+'m</span>':'')+(d.rating?'<span class="bx">'+(+d.rating).toFixed(1)+'</span>':'')+'</div><div id="mdr" class="dtmeta"></div></div>'
-+'<button class="playbig" data-watch><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg><span>'+label+'</span></button><div id="pl" class="pst" hidden></div>'
++'<button class="playbig" data-watch><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg><span>'+label+'</span></button><div id="pl" class="pst" hidden></div>'+progHtml(i)
 +(S.addons.length?'':'<p class="meta" style="text-align:center;margin:10px 0 0">Install a Stremio addon in Settings to start playing.</p>')
 +'<div class="dtacts"><button data-save>'+BM+'<span>'+(sv?"In Watchlist":"Add to Watchlist")+'</span></button>'+(live?'':'<button data-trailer>'+CL+'<span>Play Trailer</span></button>')+(tv||live?'':'<button data-mark>'+MK+'<span>'+(done?"Mark unwatched":"Mark watched")+'</span></button>')+'</div>'
 +(d.desc?'<button class="dtdesc" data-exp>'+esc(d.desc)+'</button>':'')
@@ -859,6 +881,7 @@ const tabs=[["home","Home"],["search","Search"],["sports","Sports"],["tv","TV"],
 $("#nav").innerHTML=tabs.map(t=>`<button data-tab="${t[0]}" aria-current="${S.tab===t[0]&&view===null}"><svg viewBox="0 0 24 24" aria-hidden="true">${NAVI[t[0]]}</svg><span>${t[1]}</span></button>`).join("");
 $("#hdr").textContent="";
 $("#app").innerHTML=view!==null?detail():S.tab==="home"?home():S.tab==="search"?search():S.tab==="sports"?sports():S.tab==="tv"?tvTab():S.tab==="vod"?vodTab():S.tab==="lib"?lib():settings();
+if(view===null&&(S.tab==="home"||S.tab==="lib")&&Date.now()-(window.__scanT||0)>30000){window.__scanT=Date.now();setTimeout(()=>scanNew().catch(()=>{}),600)}
 if(view===null&&S.tab==="home")loadRows();else if(view===null&&S.tab==="sports")loadSports();else if(view===null&&S.tab==="tv")tvLoad();else if(view===null&&S.tab==="vod")vodLoad();else if(view===null&&S.tab==="lib"&&CLD.mode==="cloud")cloudLoad();else if(view!==null)loadDetail();
 }
 
