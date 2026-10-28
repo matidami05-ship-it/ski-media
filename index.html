@@ -334,7 +334,7 @@ try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
 S.tmdb=S.tmdb||{on:false,key:""};S.mdb={key:"",lists:[]};S.tmdb={on:false,key:""};S.hideCloud=true;S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
 S.debrids=[];
-S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
+S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.teams=S.teams||[];S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
 let view=null;
 const $=s=>document.querySelector(s);
@@ -364,10 +364,10 @@ function show(){const r=$("#res");if(r)r.innerHTML=results()}
 function pbg(i){const m=CAT[i];return m.poster?`background:url(${m.poster}) ${isLive(m)?"center/contain no-repeat":"center/cover"},${grad(i).slice(11)}`:grad(i)}
 function adopt(x){const tv=x.media_type==="tv",id="tmdb"+(tv?"tv":"m")+x.id;let i=CAT.findIndex(m=>m.id===id);if(i<0){const o={id,tid:x.id,type:tv?"series":"movie",t:x.title||x.name||"Untitled",y:+((x.release_date||x.first_air_date||"").slice(0,4))||"",d:x.overview||"No overview yet.",g:x.id%6,poster:x.poster_path?"https://image.tmdb.org/t/p/w342"+x.poster_path:""};CAT.push(o);META[id]={r:x.vote_average||0,rt:0,gen:[],dir:"Unknown",cast:[]};S.extra.push(o);save();i=CAT.length-1}return i}
 const SMF={};
-async function addonSearch(q){const seen=new Set(),out=[];
+async function addonSearch(q,pred){pred=pred||((a,c)=>c.type==="movie"||c.type==="series");const seen=new Set(),out=[];
 await Promise.all(S.addons.map(async a=>{try{
 const mf=SMF[a.url]=SMF[a.url]||await Ski.j(a.url+"/manifest.json");
-const cats=(mf.catalogs||[]).filter(c=>(c.type==="movie"||c.type==="series")&&((c.extra||[]).some(e=>e.name==="search")||(c.extraSupported||[]).includes("search"))&&!(c.extra||[]).some(e=>e.isRequired&&e.name!=="search")&&!(c.extraRequired||[]).some(n=>n!=="search"));
+const cats=(mf.catalogs||[]).filter(c=>pred(a,c)&&((c.extra||[]).some(e=>e.name==="search")||(c.extraSupported||[]).includes("search"))&&!(c.extra||[]).some(e=>e.isRequired&&e.name!=="search")&&!(c.extraRequired||[]).some(n=>n!=="search"));
 await Promise.all(cats.slice(0,4).map(async c=>{try{
 const r=await Promise.race([Ski.j(a.url+"/catalog/"+c.type+"/"+encodeURIComponent(c.id)+"/search="+encodeURIComponent(q)+".json"),new Promise((_,j)=>setTimeout(()=>j(0),7000))]);
 (r.metas||[]).slice(0,20).forEach(m=>{if(!m||!m.id)return;const k=c.type+m.id;if(seen.has(k))return;seen.add(k);out.push({m,t:c.type})})}catch(e){}}))}catch(e){}}));
@@ -629,14 +629,35 @@ function manage(tab){const open=MG[tab],lab=tab==="home"?["Edit catalogs","Done"
 const h=`<div style="text-align:center;margin:20px 0 8px"><button class="ref" data-mg="${tab}">${lab[open?1:0]}</button></div>`;
 if(!open)return h;const l=catList(tab);
 return h+`<div class="panel" id="mgp" style="padding:12px 14px"><h3>Catalogs</h3><p>Show, hide or move rows on this page.</p>${l.length?l.map((x,i)=>`<div class="src"><div><b>${esc(x.c.name)}</b><small>${esc(x.a.name)} (${esc(x.c.type)})</small></div><button class="btn alt" style="margin:0;padding:8px 10px" data-mv="${tab}:${i}:-1" aria-label="Move up" ${i?"":"disabled"}>&uarr;</button><button class="btn alt" style="margin:0;padding:8px 10px" data-mv="${tab}:${i}:1" aria-label="Move down" ${i<l.length-1?"":"disabled"}>&darr;</button><button class="btn alt" style="margin:0;padding:8px 12px;min-width:64px" data-cv="${tab}:${i}">${x.on?"Hide":"Show"}</button></div>`).join(""):'<p class="meta">Your addons have no browsable catalogs.</p>'}</div>`}
+const SEV=[];let TMO=0,SQ="",SQT=0;
+function evText(m){return(String(m.name||"")+" "+String(m.description||"")).toLowerCase()}
+function teamParts(n){return String(n||"").replace(/^[^:]{2,20}:\s+/,"").split(/\s+(?:vs\.?|v\.?|@|at|-|–|—)\s+/i).map(x=>x.replace(/\(.*?\)/g,"").trim()).filter(x=>x.length>=3&&x.length<=40)}
+function teamSugg(){const c={};SEV.forEach(e=>{const p=teamParts(e.m.name);if(p.length>1)p.forEach(t=>{c[t]=(c[t]||0)+1})});return Object.keys(c).sort((x,y)=>c[y]-c[x]||x.localeCompare(y)).slice(0,80)}
+function teamsHtml(){const T=S.teams,sg=TMO?teamSugg().filter(t=>!T.some(x=>x.toLowerCase()===t.toLowerCase())):[];
+return'<div class="panel"><h3>My teams</h3>'+(T.length?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0">'+T.map((t,n)=>'<button class="btn" style="margin:0;padding:8px 12px" data-tmrm="'+n+'">'+esc(t)+' ✕</button>').join("")+'</div>':'<p class="meta">Pick the teams you follow and their events show first.</p>')
++'<button class="btn alt" data-tmedit style="margin:0">'+(TMO?'Done':'Choose teams')+'</button>'
++(TMO?'<div style="display:flex;gap:8px;margin-top:12px"><input id="tmin" placeholder="Type a team name" autocomplete="off" style="flex:1"><button class="btn" data-tmadd style="margin:0">Add</button></div>'
++(sg.length?'<p class="meta" style="margin:12px 0 6px">From the events your addons list:</p><div style="display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow:auto">'+sg.map((t,n)=>'<button class="btn alt" style="margin:0;padding:8px 12px" data-tm="'+esc(t)+'">+ '+esc(t)+'</button>').join("")+'</div>':'<p class="meta" style="margin-top:12px">Suggestions appear once events finish loading.</p>'):'')+'</div>'}
+function paintTeams(){const el=$("#steams");if(!el)return;
+const T=S.teams.map(t=>t.toLowerCase()),seen=new Set(),ev=SEV.filter(e=>{const x=evText(e.m);return T.some(t=>x.includes(t))&&!seen.has(e.type+e.m.id)&&seen.add(e.type+e.m.id)}).slice(0,40);
+el.innerHTML=(T.length?(ev.length?'<h2>My teams</h2><div class="row">'+ev.map(e=>card(adoptM(e.m,e.type))).join("")+'</div>':'<p class="meta">No upcoming events found for your teams yet.</p>'):'');
+const tp=$("#stpanel");if(tp&&document.activeElement!==$("#tmin"))tp.innerHTML=teamsHtml()}
 function sports(){if(!S.addons.length)return `<h2>Sports</h2><div class="panel"><h3>Add a sports addon</h3><p>Install a Stremio-format addon that offers sports or live events in Settings. Its catalogs show up here.</p><button class="btn alt" data-tab="settings">Open settings</button></div>`;
-return `<h2>Sports</h2><div id="srows">${catList("sports").some(x=>x.on)?'':'<p class="meta">No sports catalogs are showing. Tap See more to choose some.</p>'}</div>${manage("sports")}`}
-async function loadSports(){const t=loadSports.t=(loadSports.t||0)+1,e0=$("#srows");if(e0&&KH)e0.style.minHeight=KH+"px";
+return `<h2>Sports</h2><input id="sq" type="search" value="${esc(SQ)}" placeholder="Search events and teams" autocomplete="off" aria-label="Search sports"><div id="sres"></div><div id="stpanel" style="margin-top:12px">${teamsHtml()}</div><div id="steams"></div><div id="srows">${catList("sports").some(x=>x.on)?'':'<p class="meta">No sports catalogs are showing. Tap See more to choose some.</p>'}</div>${manage("sports")}`}
+async function loadSports(){const t=loadSports.t=(loadSports.t||0)+1,e0=$("#srows");if(e0&&KH)e0.style.minHeight=KH+"px";SEV.length=0;
 for(const x of catList("sports")){if(!x.on)continue;const k=x.k;
 try{RC[k]=RC[k]||await Ski.catalog(x.a,x.c)}catch(e){continue}
 const el=$("#srows");if(!el||t!==loadSports.t)return;
-el.insertAdjacentHTML("beforeend",`<h2>${esc(x.c.name)} from ${esc(x.a.name)}</h2><div class="row">${RC[k].slice(0,30).map(m=>card(adoptM(m,x.c.type))).join("")}</div>`)}
-const e1=$("#srows");if(e1&&t===loadSports.t){e1.style.minHeight="";KH=0}}
+RC[k].slice(0,100).forEach(m=>{if(m&&m.id)SEV.push({m,type:x.c.type})});
+el.insertAdjacentHTML("beforeend",`<h2>${esc(x.c.name)} from ${esc(x.a.name)}</h2><div class="row">${RC[k].slice(0,30).map(m=>card(adoptM(m,x.c.type))).join("")}</div>`);paintTeams()}
+const e1=$("#srows");if(e1&&t===loadSports.t){e1.style.minHeight="";KH=0}paintTeams();if(SQ)sportsFind(SQ)}
+async function sportsFind(q){const el=$("#sres");if(!el)return;q=q.trim();SQ=q;if(q.length<2){el.innerHTML="";return}
+const lq=q.toLowerCase(),seen=new Set(),res=[];
+SEV.forEach(e=>{if(evText(e.m).includes(lq)&&!seen.has(e.type+e.m.id)){seen.add(e.type+e.m.id);res.push(e)}});
+el.innerHTML='<p class="meta">Searching sports addons...</p>'+(res.length?'<div class="grid">'+res.slice(0,36).map(e=>card(adoptM(e.m,e.type))).join("")+'</div>':'');
+let more=[];try{more=await addonSearch(q,(a,c)=>isSportsCat(a,c))}catch(e){}
+if(q!==SQ)return;more.forEach(x=>{if(!seen.has(x.t+x.m.id)){seen.add(x.t+x.m.id);res.push({m:x.m,type:x.t})}});
+const e2=$("#sres");if(e2)e2.innerHTML=res.length?'<h2>Results</h2><div class="grid">'+res.slice(0,48).map(e=>card(adoptM(e.m,e.type))).join("")+'</div>':'<p class="meta">No events match "'+esc(q)+'".</p>'}
 function search(){return `<h2>Search</h2><input id="q" type="search" value="${esc(Q)}" placeholder="Search titles, cast, genres" autocomplete="off" aria-label="Search"><div id="res" style="margin-top:14px">${results()}</div><p class="note">Titles from TMDB appear when your API key is linked.</p>`}
 
 function showTrailer(k){closeTrailer();const o=document.createElement("div");o.id="trl";
@@ -844,6 +865,10 @@ if(d.copy!==undefined){(navigator.clipboard?navigator.clipboard.writeText(LAST.u
 if(d.mdbadd!==undefined){const v=($("#ml").value||"").trim(),mm=v.match(/mdblist\.com\/lists\/([^\/\s?#]+)\/([^\/\s?#]+)/i);if(!mm){toast("Paste a list link like mdblist.com/lists/username/list-name");return}
 S.mdb.lists.push({u:mm[1],s:mm[2],name:mm[2].replace(/-/g," ")});save();render();toast("List added. It shows on Home");return}
 if(d.mdbrm!==undefined){S.mdb.lists.splice(+d.mdbrm,1);save();render();return}
+if(d.tmedit!==undefined){TMO=TMO?0:1;paintTeams();return}
+if(d.tm!==undefined){if(!S.teams.some(x=>x.toLowerCase()===d.tm.toLowerCase()))S.teams.push(d.tm);save();paintTeams();return}
+if(d.tmadd!==undefined){const i=$("#tmin"),v=(i&&i.value||"").trim();if(v&&!S.teams.some(x=>x.toLowerCase()===v.toLowerCase())){S.teams.push(v);save()}if(i)i.value="";paintTeams();return}
+if(d.tmrm!==undefined){S.teams.splice(+d.tmrm,1);save();paintTeams();return}
 if(d.rmdeb!==undefined){S.debrids.splice(+d.rmdeb,1);save();render();toast("Service removed");return}
 if(d.top!==undefined){const a=S.debrids.splice(+d.top,1);S.debrids.unshift(a[0]);save();render();toast("Primary service updated");return}
 if(d.addon!==undefined){const v=$("#ad").value.trim().replace(/^stremio:\/\//,"https://");if(!/^https?:\/\/.+manifest\.json$/i.test(v)){toast("Enter a full manifest.json URL");return}toast("Installing...");Ski.addon(v).then(a=>{S.addons.push(a);save();render();toast(a.name+" installed")}).catch(()=>toast("Couldn't load that addon"));return}
@@ -853,7 +878,7 @@ if(d.sync!==undefined){toast("Syncing...");doSync();return}
 document.addEventListener("keydown",e=>{if(e.target.id==="q"&&e.key==="Enter"){addRecent(e.target.value);e.target.blur()}});
 document.addEventListener("change",e=>{if(e.target.id==="sv"){EP.vs=+e.target.value;render();return}if(e.target.id==="plr"){S.player=e.target.value;save();return}if(e.target.id==="hcl"){S.hideCloud=e.target.checked;CLD.mode="lib";save();toast(S.hideCloud?"Debrid cloud hidden":"Debrid cloud shown");return}if(e.target.id==="sn"||e.target.id==="en"){const m=CAT[view];if(e.target.id==="sn"){EP.s=+e.target.value||1;const f=(MC[m.aid||m.id]||[]).filter(x=>x.season===EP.s).map(x=>x.episode);EP.e=f.length?Math.min(...f):1}else EP.e=+e.target.value||1;STR=[];render();return}
 if(e.target.id==="sc"){S.simkl.scrobble=e.target.checked;save()}});
-document.addEventListener("input",e=>{if(e.target.id==="q"){Q=e.target.value;show();tsearch(Q)}});
+document.addEventListener("input",e=>{if(e.target.id==="sq"){clearTimeout(SQT);const v=e.target.value;SQT=setTimeout(()=>sportsFind(v),400);return}if(e.target.id==="q"){Q=e.target.value;show();tsearch(Q)}});
 render();
 
 /* ---------- IPTV / TV tab ---------- */
