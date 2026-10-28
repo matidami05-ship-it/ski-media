@@ -334,7 +334,7 @@ try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
 S.tmdb=S.tmdb||{on:false,key:""};S.mdb={key:"",lists:[]};S.hideCloud=true;S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
 S.debrids=[];
-S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.teams=S.teams||[];S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
+S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.tab="home";S.eps=S.eps||{};S.teams=S.teams||[];S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
 let view=null;
 const $=s=>document.querySelector(s);

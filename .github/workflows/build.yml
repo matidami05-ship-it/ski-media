@@ -1832,6 +1832,9 @@ jobs:
           print("Player set up")
           PY
           python3 player_setup.py
+          mkdir -p ~/.android && cp ci/debug.keystore ~/.android/debug.keystore
+          sed -i "s/versionCode 1\b/versionCode ${GITHUB_RUN_NUMBER}/; s/versionName \"1.0\"/versionName \"1.0.${GITHUB_RUN_NUMBER}\"/" android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
           npx cap sync android
           cd android
           chmod +x gradlew
