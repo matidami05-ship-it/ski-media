@@ -762,7 +762,18 @@ if(!epList(i).length){await tmdbEps(i);fill=1}}catch(e){}
 EPF[m.id]=2;if(view!==i||!fill)return;
 if(epList(i).length&&!S.last[m.id]&&EP.i===i){const l=epList(i);EP.s=l[0].season;EP.e=l[0].episode}
 softRender()}
-async function loadDetail(){const i=view;if(i===null)return;const m=CAT[i],id=m.aid||m.id;if(isTv(m)&&S.tmdb.on&&!EPF[m.id]&&(m.tid||/^tt\d+$/.test(id)||(TM[m.id]&&TM[m.id].tid)))ensureEps(i);
+const AEP={};
+async function addonEps(i){const m=CAT[i];if(!isTv(m)||AEP[m.id]||epList(i).length)return;AEP[m.id]=1;
+const cm="https://v3-cinemeta.strem.io";let imdb="",vids=[];const oid=m.aid||m.id;
+try{if(/^tt\d+$/.test(oid))imdb=oid;
+if(!imdb){for(const a of S.addons.filter(a=>a.res.includes("meta"))){try{const r=await Ski.j(a.url+"/meta/series/"+encodeURIComponent(oid)+".json");const mm=r.meta||{};const v=(mm.videos||[]).filter(x=>x.season>0&&x.episode>0);if(v.length){vids=v;break}const ii=mm.imdb_id||mm.imdbId||(/^tt\d+$/.test(mm.id||"")?mm.id:"");if(ii){imdb=ii;break}}catch(e){}}}
+if(!vids.length&&!imdb){const r=await Ski.j(cm+"/catalog/series/top/search="+encodeURIComponent(m.t)+".json");const L=r.metas||[];const nm=x=>String(x||"").toLowerCase().replace(/[^a-z0-9]/g,"");const f=L.find(x=>nm(x.name)===nm(m.t)&&(!m.y||String(x.releaseInfo||x.year||"").slice(0,4)===String(m.y).slice(0,4)))||L.find(x=>nm(x.name)===nm(m.t));if(f)imdb=f.id}
+if(!vids.length&&imdb){const r=await Ski.j(cm+"/meta/series/"+imdb+".json");vids=((r.meta&&r.meta.videos)||[]).filter(x=>x.season>0&&x.episode>0)}
+if(vids.length){MC[oid]=vids;if(imdb&&!/^tt\d+$/.test(oid)){m.aid=imdb;MC[imdb]=vids;save()}}}catch(e){}
+if(view!==i||!epList(i).length)return;
+if(!S.last[m.id]&&EP.i===i){const l=epList(i);EP.s=l[0].season;EP.e=l[0].episode}
+softRender()}
+async function loadDetail(){const i=view;if(i===null)return;if(isTv(CAT[i])&&!epList(i).length)setTimeout(()=>{if(view===i&&!epList(i).length)addonEps(i)},1200);const m=CAT[i],id=m.aid||m.id;if(isTv(m)&&S.tmdb.on&&!EPF[m.id]&&(m.tid||/^tt\d+$/.test(id)||(TM[m.id]&&TM[m.id].tid)))ensureEps(i);
 if(isTv(m)&&!/^tt\d+$/.test(id)&&S.tmdb.on)loadTmdb(i);
 if(/^tt\d+$/.test(id)&&!(id in MT)){await fetchMeta(m);if(view!==i)return;
 if(isTv(m)&&!S.last[m.id]&&EP.i===i){const l=epList(i);if(l.length){EP.s=l[0].season;EP.e=l[0].episode}}
