@@ -792,6 +792,17 @@ window.__skiInstall=function(u){try{u=String(u||"").trim().replace(/^stremio:\/\
 if(window.__skiLast===u&&Date.now()-(window.__skiLastT||0)<20000)return;window.__skiLast=u;window.__skiLastT=Date.now();window.__skiPendingUrl=null;
 toast("Installing addon...");Ski.addon(u).then(a=>{if(S.addons.some(x=>x.url===a.url)){toast(a.name+" is already installed");return}S.addons.push(a);save();render();toast(a.name+" installed")}).catch(()=>toast("Couldn't load that addon"))}catch(e){}};
 if(window.__skiPendingUrl)setTimeout(()=>window.__skiInstall(window.__skiPendingUrl),800);
+function cfgExport(hist){const o={ski:1,v:1,t:Date.now(),addons:S.addons,iptv:S.iptv,tmdb:S.tmdb,player:S.player,teams:S.teams,cv:S.cv,ord:S.ord,tvmode:S.tvmode,upd:{token:(S.upd&&S.upd.token)||""}};
+if(hist){o.hist={pos:S.pos,eps:S.eps,watched:S.watched,last:S.last,recent:S.recent,extra:S.extra}}return JSON.stringify(o)}
+function cfgImport(txt){let o;try{o=JSON.parse(String(txt).trim())}catch(e){return"That isn't a Ski Media configuration."}
+if(!o||o.ski!==1)return"That isn't a Ski Media configuration.";
+if(Array.isArray(o.addons))S.addons=o.addons.filter(a=>a&&typeof a==="object");if(o.iptv)S.iptv=o.iptv;if(o.tmdb)S.tmdb=o.tmdb;if(o.player)S.player=o.player;if(Array.isArray(o.teams))S.teams=o.teams;if(o.cv)S.cv=o.cv;if(o.ord)S.ord=o.ord;if(o.tvmode)S.tvmode=o.tvmode;if(o.upd)S.upd=Object.assign(S.upd||{},o.upd);
+if(o.hist){["pos","eps","watched","last"].forEach(k=>{if(o.hist[k])S[k]=Object.assign({},S[k]||{},o.hist[k])});if(Array.isArray(o.hist.recent))S.recent=o.hist.recent;if(Array.isArray(o.hist.extra)){const ids=new Set((S.extra||[]).map(x=>x.id));o.hist.extra.forEach(x=>{if(x&&!ids.has(x.id))S.extra.push(x)})}}
+save();return""}
+async function cfgSave(){const P=updPlug(),txt=cfgExport($("#cfh")&&$("#cfh").checked),st=t=>{const e=$("#cfst");if(e)e.textContent=t};
+if(P&&P.saveText){try{const r=await P.saveText({name:"ski-media-config.json",text:txt});st("Saved to "+r.path+". Copy that file to your TV and use Import below.")}catch(e){st("Couldn't save the file: "+((e&&e.message)||e))}}else{try{await navigator.clipboard.writeText(txt);st("Copied to the clipboard.")}catch(e){st("Saving only works in the installed app.")}}}
+function cfgShare(){const P=updPlug(),txt=cfgExport($("#cfh")&&$("#cfh").checked);if(P&&P.shareText)P.shareText({text:txt}).catch(()=>toast("Couldn't open sharing"));else navigator.clipboard.writeText(txt).then(()=>toast("Copied")).catch(()=>toast("Couldn't copy"))}
+function cfgApply(txt){const e=cfgImport(txt),st=$("#cfst");if(e){if(st)st.textContent=e;return}toast("Configuration imported");setTimeout(()=>location.reload(),600)}
 const UPD={code:0,name:"",rel:null};
 function updPlug(){const C=window.Capacitor;return(C&&C.Plugins&&C.Plugins.SkiUpdate)||null}
 async function updVer(){const P=updPlug();if(!P||UPD.code)return;try{const v=await P.version();UPD.code=+v.code;UPD.name=v.name}catch(e){}}
@@ -888,7 +899,14 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 +(S.addons.length?'<div id="streams" hidden></div>':'')}
 
 function settings(){
-return `<h2>Settings</h2><div class="panel"><h3>App updates</h3><p>${UPD.name?"Version "+esc(UPD.name):"Checks for a newer Ski Media build, downloads it and opens the installer."}</p><p class="meta" id="updst"></p>
+return `<h2>Settings</h2><div class="panel"><h3>Backup &amp; transfer</h3><p>Save your addons, IPTV lists, teams and settings to a file, then import it on your TV app or another phone.</p>
+<label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="cfh" style="width:auto"> Include watch history</label>
+<button class="btn" data-cfsave>Save to a file</button> <button class="btn alt" data-cfshare>Share / copy</button>
+<p class="meta" id="cfst"></p>
+<label for="cff">Import from a file</label><input id="cff" type="file" accept=".json,application/json,text/plain">
+<label for="cft">Or paste a configuration</label><textarea id="cft" rows="3" placeholder="Paste the configuration text" style="width:100%"></textarea>
+<button class="btn" data-cfimp>Import pasted text</button></div>
+<div class="panel"><h3>App updates</h3><p>${UPD.name?"Version "+esc(UPD.name):"Checks for a newer Ski Media build, downloads it and opens the installer."}</p><p class="meta" id="updst"></p>
 <button class="btn" data-updchk>Check for updates</button> <button class="btn" id="updgo" data-updgo ${UPD.rel?"":"hidden"}>Download &amp; install</button>
 <label for="ugt">GitHub token (needed while the repo is private)</label><input id="ugt" type="password" autocomplete="off" value="${esc(S.upd.token||"")}" placeholder="Fine-grained token, Contents: read">
 </div>
@@ -972,6 +990,9 @@ if(d.tmedit!==undefined){TMO=TMO?0:1;paintTeams();return}
 if(d.tm!==undefined){if(!S.teams.some(x=>x.toLowerCase()===d.tm.toLowerCase()))S.teams.push(d.tm);save();paintTeams();return}
 if(d.tmadd!==undefined){const i=$("#tmin"),v=(i&&i.value||"").trim();if(v&&!S.teams.some(x=>x.toLowerCase()===v.toLowerCase())){S.teams.push(v);save()}if(i)i.value="";paintTeams();return}
 if(d.tmrm!==undefined){S.teams.splice(+d.tmrm,1);save();paintTeams();return}
+if(d.cfsave!==undefined){cfgSave();return}
+if(d.cfshare!==undefined){cfgShare();return}
+if(d.cfimp!==undefined){const t=$("#cft");cfgApply(t?t.value:"");return}
 if(d.updchk!==undefined){updCheck(true);return}
 if(d.updgo!==undefined){updInstall();return}
 if(d.rmdeb!==undefined){S.debrids.splice(+d.rmdeb,1);save();render();toast("Service removed");return}
@@ -981,7 +1002,7 @@ if(d.rm!==undefined){S.addons.splice(+d.rm,1);save();render();return}
 if(d.sync!==undefined){toast("Syncing...");doSync();return}
 });
 document.addEventListener("keydown",e=>{if(e.target.id==="q"&&e.key==="Enter"){addRecent(e.target.value);e.target.blur()}});
-document.addEventListener("change",e=>{if(e.target.id==="ugt"){S.upd.token=e.target.value.trim();save();toast("Token saved");return}if(e.target.id==="sv"){EP.vs=+e.target.value;render();return}if(e.target.id==="plr"){S.player=e.target.value;save();return}if(e.target.id==="hcl"){S.hideCloud=e.target.checked;CLD.mode="lib";save();toast(S.hideCloud?"Debrid cloud hidden":"Debrid cloud shown");return}if(e.target.id==="sn"||e.target.id==="en"){const m=CAT[view];if(e.target.id==="sn"){EP.s=+e.target.value||1;const f=(MC[m.aid||m.id]||[]).filter(x=>x.season===EP.s).map(x=>x.episode);EP.e=f.length?Math.min(...f):1}else EP.e=+e.target.value||1;STR=[];render();return}
+document.addEventListener("change",e=>{if(e.target.id==="cff"){const f=e.target.files&&e.target.files[0];if(f){const rd=new FileReader();rd.onload=()=>cfgApply(rd.result);rd.readAsText(f)}return}if(e.target.id==="ugt"){S.upd.token=e.target.value.trim();save();toast("Token saved");return}if(e.target.id==="sv"){EP.vs=+e.target.value;render();return}if(e.target.id==="plr"){S.player=e.target.value;save();return}if(e.target.id==="hcl"){S.hideCloud=e.target.checked;CLD.mode="lib";save();toast(S.hideCloud?"Debrid cloud hidden":"Debrid cloud shown");return}if(e.target.id==="sn"||e.target.id==="en"){const m=CAT[view];if(e.target.id==="sn"){EP.s=+e.target.value||1;const f=(MC[m.aid||m.id]||[]).filter(x=>x.season===EP.s).map(x=>x.episode);EP.e=f.length?Math.min(...f):1}else EP.e=+e.target.value||1;STR=[];render();return}
 if(e.target.id==="sc"){S.simkl.scrobble=e.target.checked;save()}});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){clearTimeout(SQT);const v=e.target.value;SQT=setTimeout(()=>sportsFind(v),400);return}if(e.target.id==="q"){Q=e.target.value;show();tsearch(Q)}});
 render();
