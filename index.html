@@ -300,6 +300,7 @@ tt0063350:{r:7.8,rt:96,gen:["Horror","Thriller"],dir:"George A. Romero",cast:["D
 tt0032599:{r:7.8,rt:92,gen:["Comedy","Romance"],dir:"Howard Hawks",cast:["Cary Grant","Rosalind Russell","Ralph Bellamy"]},
 tt0056923:{r:7.9,rt:113,gen:["Comedy","Mystery","Romance"],dir:"Stanley Donen",cast:["Cary Grant","Audrey Hepburn","Walter Matthau"]}};
 const TM={};
+let _sr=0;function softRender(){clearTimeout(_sr);_sr=setTimeout(()=>{const pl=$("#pl");if(view!==null&&pl&&!pl.hidden)return;render()},350)}
 async function loadTmdb(i){const id=CAT[i].id;if(!S.tmdb.on||TM[id]||loadTmdb.p===id||isLive(CAT[i])||(!CAT[i].tid&&CAT[i].aid&&!/^tt\d+$/.test(CAT[i].aid)))return;loadTmdb.p=id;
 try{const k=encodeURIComponent(S.tmdb.key),b="https://api.themoviedb.org/3",im="https://image.tmdb.org/t/p/",x=META[id];
 let kind="movie",tid=CAT[i].tid;if(tid){kind=isTv(CAT[i])?"tv":"movie"}else{const f=await(await fetch(`${b}/find/${id}?external_source=imdb_id&api_key=${k}`)).json();const tv=f.tv_results&&f.tv_results[0],mv=f.movie_results&&f.movie_results[0],pick=isTv(CAT[i])?(tv||mv):(mv||tv);if(!pick)throw 0;kind=(pick===tv)?"tv":"movie";tid=pick.id}
@@ -308,7 +309,7 @@ const cr=d.credits||{};
 TM[id]={tid,ov:d.overview,r:d.vote_average||x.r,rt:d.runtime||(d.episode_run_time||[])[0]||x.rt,gen:(d.genres||[]).map(g=>g.name),dir:((cr.crew||[]).find(p=>p.job==="Director")||{}).name||((d.created_by||[])[0]||{}).name||x.dir,cast:(cr.cast||[]).slice(0,14).map(p=>({n:p.name,ch:p.character||"",img:p.profile_path?im+"w185"+p.profile_path:""})),
 crew:(()=>{const seen={},o=[],add=(n,ch,pp)=>{if(n&&!seen[n]){seen[n]=1;o.push({n,ch,img:pp?im+"w185"+pp:""})}};(d.created_by||[]).forEach(p=>add(p.name,"Creator",p.profile_path));(cr.crew||[]).filter(p=>["Director","Writer","Screenplay","Executive Producer"].includes(p.job)).forEach(p=>add(p.name,p.job,p.profile_path));return o.slice(0,6)})(),
 rec:(((d.recommendations||{}).results)||[]).slice(0,14).map(z=>({id:z.id,title:z.title,name:z.name,release_date:z.release_date,first_air_date:z.first_air_date,overview:z.overview,poster_path:z.poster_path,vote_average:z.vote_average,media_type:kind==="tv"?"tv":"movie"})),bd:d.backdrop_path?im+"w780"+d.backdrop_path:"",cert:kind==="tv"?((((d.content_ratings||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{}).rating||"":(((((d.release_dates||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{release_dates:[]}).release_dates.find(z=>z.certification)||{}).certification||"",trailer:((((d.videos||{}).results)||[]).find(z=>z.site==="YouTube"&&z.type==="Trailer")||{}).key||""};
-const ix=d.external_ids&&d.external_ids.imdb_id;if(ix&&!CAT[i].aid&&!/^tt/.test(CAT[i].id)){CAT[i].aid=ix;save()}if(view===i)render();
+const ix=d.external_ids&&d.external_ids.imdb_id;if(ix&&!CAT[i].aid&&!/^tt/.test(CAT[i].id)){CAT[i].aid=ix;save()}if(view===i)softRender();
 }catch(e){toast("TMDB unavailable. Showing sample details.")}
 loadTmdb.p=null}
 function tm(i){return S.tmdb.on&&TM[CAT[i].id]||null}
@@ -725,12 +726,12 @@ try{const id=m.aid||m.id;if(/^tt\d+$/.test(id)&&!(id in MT))await fetchMeta(m);
 if(!epList(i).length){await tmdbEps(i);fill=1}}catch(e){}
 EPF[m.id]=2;if(view!==i||!fill)return;
 if(epList(i).length&&!S.last[m.id]&&EP.i===i){const l=epList(i);EP.s=l[0].season;EP.e=l[0].episode}
-render()}
+softRender()}
 async function loadDetail(){const i=view;if(i===null)return;const m=CAT[i],id=m.aid||m.id;if(isTv(m)&&S.tmdb.on&&!EPF[m.id]&&(m.tid||/^tt\d+$/.test(id)||(TM[m.id]&&TM[m.id].tid)))ensureEps(i);
 if(isTv(m)&&!/^tt\d+$/.test(id)&&S.tmdb.on)loadTmdb(i);
 if(/^tt\d+$/.test(id)&&!(id in MT)){await fetchMeta(m);if(view!==i)return;
 if(isTv(m)&&!S.last[m.id]&&EP.i===i){const l=epList(i);if(l.length){EP.s=l[0].season;EP.e=l[0].episode}}
-const pl=$("#pl");if(!pl||pl.hidden)render();return}
+const pl=$("#pl");if(!pl||pl.hidden)softRender();return}
 if(S.addons.length)loadStreams()}
 function playEp(s,e){const i=view;EP.i=i;EP.s=s;EP.e=e;EP.vs=s;S.last[CAT[i].id]={s,e};save();STR=[];render();
 try{(document.getElementById("scr")||window).scrollTo({top:0,behavior:"smooth"})}catch(x){}playBest(i)}
