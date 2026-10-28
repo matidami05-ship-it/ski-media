@@ -630,7 +630,8 @@ const h=`<div style="text-align:center;margin:20px 0 8px"><button class="ref" da
 if(!open)return h;const l=catList(tab);
 return h+`<div class="panel" id="mgp" style="padding:12px 14px"><h3>Catalogs</h3><p>Show, hide or move rows on this page.</p>${l.length?l.map((x,i)=>`<div class="src"><div><b>${esc(x.c.name)}</b><small>${esc(x.a.name)} (${esc(x.c.type)})</small></div><button class="btn alt" style="margin:0;padding:8px 10px" data-mv="${tab}:${i}:-1" aria-label="Move up" ${i?"":"disabled"}>&uarr;</button><button class="btn alt" style="margin:0;padding:8px 10px" data-mv="${tab}:${i}:1" aria-label="Move down" ${i<l.length-1?"":"disabled"}>&darr;</button><button class="btn alt" style="margin:0;padding:8px 12px;min-width:64px" data-cv="${tab}:${i}">${x.on?"Hide":"Show"}</button></div>`).join(""):'<p class="meta">Your addons have no browsable catalogs.</p>'}</div>`}
 const SEV=[];let TMO=0,SQ="",SQT=0;
-function evText(m){return(String(m.name||"")+" "+String(m.description||"")).toLowerCase()}
+function nz(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()}
+function evText(m){return nz(String(m.name||"")+" "+String(m.description||""))}
 function teamParts(n){return String(n||"").replace(/^[^:]{2,20}:\s+/,"").split(/\s+(?:vs\.?|v\.?|@|at|-|–|—)\s+/i).map(x=>x.replace(/\(.*?\)/g,"").trim()).filter(x=>x.length>=3&&x.length<=40)}
 function teamSugg(){const c={};SEV.forEach(e=>{const p=teamParts(e.m.name);if(p.length>1)p.forEach(t=>{c[t]=(c[t]||0)+1})});return Object.keys(c).sort((x,y)=>c[y]-c[x]||x.localeCompare(y)).slice(0,80)}
 function teamsHtml(){const T=S.teams,sg=TMO?teamSugg().filter(t=>!T.some(x=>x.toLowerCase()===t.toLowerCase())):[];
@@ -639,16 +640,19 @@ return'<div class="panel"><h3>My teams</h3>'+(T.length?'<div style="display:flex
 +(TMO?'<div style="display:flex;gap:8px;margin-top:12px"><input id="tmin" placeholder="Type a team name" autocomplete="off" style="flex:1"><button class="btn" data-tmadd style="margin:0">Add</button></div>'
 +(sg.length?'<p class="meta" style="margin:12px 0 6px">From the events your addons list:</p><div style="display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow:auto">'+sg.map((t,n)=>'<button class="btn alt" style="margin:0;padding:8px 12px" data-tm="'+esc(t)+'">+ '+esc(t)+'</button>').join("")+'</div>':'<p class="meta" style="margin-top:12px">Suggestions appear once events finish loading.</p>'):'')+'</div>'}
 function paintTeams(){const el=$("#steams");if(!el)return;
-const T=S.teams.map(t=>t.toLowerCase()),seen=new Set(),ev=SEV.filter(e=>{const x=evText(e.m);return T.some(t=>x.includes(t))&&!seen.has(e.type+e.m.id)&&seen.add(e.type+e.m.id)}).slice(0,40);
+const T=S.teams.map(nz),seen=new Set(),ev=SEV.filter(e=>{const x=evText(e.m);return T.some(t=>x.includes(t))&&!seen.has(e.type+e.m.id)&&seen.add(e.type+e.m.id)}).slice(0,40);
 el.innerHTML=(T.length?(ev.length?'<h2>My teams</h2><div class="row">'+ev.map(e=>card(adoptM(e.m,e.type))).join("")+'</div>':'<p class="meta">No upcoming events found for your teams yet.</p>'):'');
 const tp=$("#stpanel");if(tp&&document.activeElement!==$("#tmin"))tp.innerHTML=teamsHtml()}
 function sports(){if(!S.addons.length)return `<h2>Sports</h2><div class="panel"><h3>Add a sports addon</h3><p>Install a Stremio-format addon that offers sports or live events in Settings. Its catalogs show up here.</p><button class="btn alt" data-tab="settings">Open settings</button></div>`;
 return `<h2>Sports</h2><input id="sq" type="search" value="${esc(SQ)}" placeholder="Search events and teams" autocomplete="off" aria-label="Search sports"><div id="sres"></div><div id="stpanel" style="margin-top:12px">${teamsHtml()}</div><div id="steams"></div><div id="srows">${catList("sports").some(x=>x.on)?'':'<p class="meta">No sports catalogs are showing. Tap See more to choose some.</p>'}</div>${manage("sports")}`}
+const EVC={};
+async function evPages(x){const k=x.k;if(EVC[k])return EVC[k];let all=[];try{all=(RC[k]=RC[k]||await Ski.catalog(x.a,x.c)).slice()}catch(e){return EVC[k]=[]}
+for(let s=100;s<=300&&all.length>=s;s+=100){try{const r=await Ski.j(x.a.url+"/catalog/"+x.c.type+"/"+encodeURIComponent(x.c.id)+"/skip="+s+".json");const m=r.metas||[];if(!m.length)break;all=all.concat(m)}catch(e){break}}return EVC[k]=all}
 async function loadSports(){const t=loadSports.t=(loadSports.t||0)+1,e0=$("#srows");if(e0&&KH)e0.style.minHeight=KH+"px";SEV.length=0;
+const seenE=new Set();Promise.all(catList("sports").filter(x=>x.on||isSportsCat(x.a,x.c)).map(async x=>{const L=await evPages(x);if(t!==loadSports.t)return;L.forEach(m=>{if(m&&m.id&&!seenE.has(x.c.type+m.id)){seenE.add(x.c.type+m.id);SEV.push({m,type:x.c.type})}});paintTeams()})).then(()=>{if(t===loadSports.t){paintTeams();if(SQ)sportsFind(SQ)}});
 for(const x of catList("sports")){if(!x.on)continue;const k=x.k;
 try{RC[k]=RC[k]||await Ski.catalog(x.a,x.c)}catch(e){continue}
 const el=$("#srows");if(!el||t!==loadSports.t)return;
-RC[k].slice(0,100).forEach(m=>{if(m&&m.id)SEV.push({m,type:x.c.type})});
 el.insertAdjacentHTML("beforeend",`<h2>${esc(x.c.name)} from ${esc(x.a.name)}</h2><div class="row">${RC[k].slice(0,30).map(m=>card(adoptM(m,x.c.type))).join("")}</div>`);paintTeams()}
 const e1=$("#srows");if(e1&&t===loadSports.t){e1.style.minHeight="";KH=0}paintTeams();if(SQ)sportsFind(SQ)}
 async function sportsFind(q){const el=$("#sres");if(!el)return;q=q.trim();SQ=q;if(q.length<2){el.innerHTML="";return}
