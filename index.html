@@ -284,6 +284,8 @@ input[type=search]{-webkit-appearance:none;appearance:none}
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
 <script src="engine.js"></script>
 <script>
+(function(){const of=window.fetch.bind(window);window.fetch=function(u,o){try{const s=String(u&&u.url||u);if(s.indexOf("api.themoviedb.org")>-1){let url=s,opt=Object.assign({},o||{});const m=url.match(/[?&]api_key=(eyJ[^&]+)/);if(m){url=url.replace(/([?&])api_key=eyJ[^&]+&?/,"$1").replace(/[?&]$/,"");opt.headers=Object.assign({},opt.headers||{},{Authorization:"Bearer "+decodeURIComponent(m[1])})}
+const c=new AbortController();const t=setTimeout(()=>c.abort(),9000);opt.signal=c.signal;return of(url,opt).then(r=>{clearTimeout(t);if(r.status===401||r.status===403)window.__tmdb401=1;return r},e=>{clearTimeout(t);throw e})}}catch(e){}return of(u,o)}})();
 const GRAD=[["#2f5d8a","#0d1b24"],["#8a2f3b","#1d0d12"],["#3c6e5a","#0c1d17"],["#7a5a2f","#1e150a"],["#4b3c8a","#12101f"],["#2f7a86","#0a1c20"]];
 const CAT=[
 {id:"tt0013442",t:"Nosferatu",y:1922,type:"movie",d:"A count from the Carpathians brings plague and dread to a quiet port town.",g:0},
@@ -301,7 +303,7 @@ tt0063350:{r:7.8,rt:96,gen:["Horror","Thriller"],dir:"George A. Romero",cast:["D
 tt0032599:{r:7.8,rt:92,gen:["Comedy","Romance"],dir:"Howard Hawks",cast:["Cary Grant","Rosalind Russell","Ralph Bellamy"]},
 tt0056923:{r:7.9,rt:113,gen:["Comedy","Mystery","Romance"],dir:"Stanley Donen",cast:["Cary Grant","Audrey Hepburn","Walter Matthau"]}};
 const TM={};
-let _sr=0;function softRender(){clearTimeout(_sr);_sr=setTimeout(()=>{const pl=$("#pl");if(view!==null&&pl&&!pl.hidden)return;render()},350)}
+let _sr=0;function softRender(){clearTimeout(_sr);_sr=setTimeout(()=>{const pl=$("#pl");if(view!==null&&pl&&!pl.hidden)return;render()},150)}
 async function loadTmdb(i){const id=CAT[i].id;if(!S.tmdb.on||TM[id]||loadTmdb.p===id||isLive(CAT[i])||(!CAT[i].tid&&CAT[i].aid&&!/^tt\d+$/.test(CAT[i].aid)))return;loadTmdb.p=id;
 try{const k=encodeURIComponent(S.tmdb.key),b="https://api.themoviedb.org/3",im="https://image.tmdb.org/t/p/",x=META[id];
 let kind="movie",tid=CAT[i].tid;if(tid){kind=isTv(CAT[i])?"tv":"movie"}else{const f=await(await fetch(`${b}/find/${id}?external_source=imdb_id&api_key=${k}`)).json();const tv=f.tv_results&&f.tv_results[0],mv=f.movie_results&&f.movie_results[0],pick=isTv(CAT[i])?(tv||mv):(mv||tv);if(!pick)throw 0;kind=(pick===tv)?"tv":"movie";tid=pick.id}
@@ -309,9 +311,9 @@ const d=await(await fetch(`${b}/${kind}/${tid}?append_to_response=credits,extern
 const cr=d.credits||{};
 TM[id]={tid,ov:d.overview,r:d.vote_average||x.r,rt:d.runtime||(d.episode_run_time||[])[0]||x.rt,gen:(d.genres||[]).map(g=>g.name),dir:((cr.crew||[]).find(p=>p.job==="Director")||{}).name||((d.created_by||[])[0]||{}).name||x.dir,cast:(cr.cast||[]).slice(0,14).map(p=>({n:p.name,ch:p.character||"",img:p.profile_path?im+"w185"+p.profile_path:""})),
 crew:(()=>{const seen={},o=[],add=(n,ch,pp)=>{if(n&&!seen[n]){seen[n]=1;o.push({n,ch,img:pp?im+"w185"+pp:""})}};(d.created_by||[]).forEach(p=>add(p.name,"Creator",p.profile_path));(cr.crew||[]).filter(p=>["Director","Writer","Screenplay","Executive Producer"].includes(p.job)).forEach(p=>add(p.name,p.job,p.profile_path));return o.slice(0,6)})(),
-rec:(((d.recommendations||{}).results)||[]).slice(0,14).map(z=>({id:z.id,title:z.title,name:z.name,release_date:z.release_date,first_air_date:z.first_air_date,overview:z.overview,poster_path:z.poster_path,vote_average:z.vote_average,media_type:kind==="tv"?"tv":"movie"})),bd:d.backdrop_path?im+"w780"+d.backdrop_path:"",cert:kind==="tv"?((((d.content_ratings||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{}).rating||"":(((((d.release_dates||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{release_dates:[]}).release_dates.find(z=>z.certification)||{}).certification||"",trailer:((((d.videos||{}).results)||[]).find(z=>z.site==="YouTube"&&z.type==="Trailer")||{}).key||""};
+rec:(((d.recommendations||{}).results)||[]).slice(0,14).map(z=>({id:z.id,title:z.title,name:z.name,release_date:z.release_date,first_air_date:z.first_air_date,overview:z.overview,poster_path:z.poster_path,vote_average:z.vote_average,media_type:kind==="tv"?"tv":"movie"})),bd:d.backdrop_path?im+"w780"+d.backdrop_path:"",pgd:(()=>{try{const a=kind==="tv"?((((d.content_ratings||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{}):((((((d.release_dates||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{release_dates:[]}).release_dates.find(z=>z.certification)||{}));return a.descriptors||[]}catch(e){return[]}})(),cert:kind==="tv"?((((d.content_ratings||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{}).rating||"":(((((d.release_dates||{}).results)||[]).find(z=>z.iso_3166_1==="US")||{release_dates:[]}).release_dates.find(z=>z.certification)||{}).certification||"",trailer:((((d.videos||{}).results)||[]).find(z=>z.site==="YouTube"&&z.type==="Trailer")||{}).key||""};
 const ix=d.external_ids&&d.external_ids.imdb_id;if(ix&&!CAT[i].aid&&!/^tt/.test(CAT[i].id)){CAT[i].aid=ix;save()}if(view===i)softRender();
-}catch(e){toast("TMDB unavailable. Showing sample details.")}
+}catch(e){toast(window.__tmdb401?"TMDB rejected your key. In Settings paste the API Key (v3) or the Read Access Token from your TMDB account.":"TMDB is slow or unreachable. Showing addon details.");window.__tmdb401=0}
 loadTmdb.p=null}
 function tm(i){return S.tmdb.on&&TM[CAT[i].id]||null}
 function heroBg(i){const t=tm(i);return t&&t.bd?`background:linear-gradient(transparent 30%,rgba(0,0,0,.75)),url(${t.bd}) center/cover`:grad(i)}
@@ -355,7 +357,7 @@ function addRecent(q){q=(q||"").trim();if(q.length<2)return;S.recent=[q].concat(
 function recentHtml(){if(!S.recent.length)return"";return `<div style="display:flex;justify-content:space-between;align-items:center"><h2>Recent searches</h2><button class="ref" data-rclear>Clear</button></div><div>${S.recent.map((q,i)=>`<span class="rc"><button data-rq="${i}">${esc(q)}</button><button data-rx="${i}" aria-label="Remove ${esc(q)}">&times;</button></span>`).join("")}</div>`}
 function hits(q){q=q.trim().toLowerCase();if(!q)return[];return CAT.map((m,i)=>i).filter(i=>{const m=CAT[i],x=META[m.id];return[m.t,m.y,x.dir,x.cast.join(" "),x.gen.join(" ")].join(" ").toLowerCase().includes(q)})}
 function results(){const q=Q.trim();if(!q)return `<p class="meta">Search by title, year, director, actor or genre.</p>${recentHtml()}<h2>Browse all</h2><div class="grid">${CAT.map((m,i)=>i).filter(i=>!CAT[i].tid).map(i=>card(i)).join("")}</div>`;
-const h=hits(Q).filter(i=>!CAT[i].tid);let out=h.length?`<h2>In your catalog</h2><div class="grid">${h.map(i=>card(i)).join("")}</div>`:"";
+const h=hits(Q).filter(i=>!CAT[i].tid&&/^addon/.test(CAT[i].id));let out=h.length?`<h2>In your catalog</h2><div class="grid">${h.map(i=>card(i)).join("")}</div>`:"";
 if(0){}else if(TS==="loading")out+=`<p class="meta">Searching your addons...</p>`;
 else if(TS==="error")out+=`<div class="panel" style="margin-top:16px"><h3>Search failed</h3><p>Couldn't search your addons. Check that you're online.</p></div>`;
 else if(TS==="done")out+=TR.length?`<h2>Results</h2><div class="grid">${TR.map(i=>card(i)).join("")}</div>`:`<p class="meta">Nothing matches "${esc(Q)}".</p>`;
@@ -778,7 +780,7 @@ if(vids.length){MC[oid]=vids;if(imdb&&!/^tt\d+$/.test(oid)){m.aid=imdb;MC[imdb]=
 if(view!==i||!epList(i).length)return;
 if(!S.last[m.id]&&EP.i===i){const l=epList(i);EP.s=l[0].season;EP.e=l[0].episode}
 softRender()}
-async function loadDetail(){const i=view;if(i===null)return;if(isTv(CAT[i])&&!epList(i).length)setTimeout(()=>{if(view===i&&!epList(i).length)addonEps(i)},1200);const m=CAT[i],id=m.aid||m.id;if(isTv(m)&&S.tmdb.on&&!EPF[m.id]&&(m.tid||/^tt\d+$/.test(id)||(TM[m.id]&&TM[m.id].tid)))ensureEps(i);
+async function loadDetail(){const i=view;if(i===null)return;if(isTv(CAT[i])&&!epList(i).length)setTimeout(()=>{if(view===i&&!epList(i).length)addonEps(i)},400);const m=CAT[i],id=m.aid||m.id;if(isTv(m)&&S.tmdb.on&&!EPF[m.id]&&(m.tid||/^tt\d+$/.test(id)||(TM[m.id]&&TM[m.id].tid)))ensureEps(i);
 if(isTv(m)&&!/^tt\d+$/.test(id)&&S.tmdb.on)loadTmdb(i);
 if(/^tt\d+$/.test(id)&&!(id in MT)){await fetchMeta(m);if(view!==i)return;
 if(isTv(m)&&!S.last[m.id]&&EP.i===i){const l=epList(i);if(l.length){EP.s=l[0].season;EP.e=l[0].episode}}
@@ -792,7 +794,14 @@ if(t.cast&&t.cast.length)list=t.cast.concat(t.crew||[]);
 else list=(mt.cast||[]).map(n=>({n,ch:"",img:""})).concat((mt.director||[]).map(n=>({n,ch:"Director",img:""})));
 if(!list.length)return"";
 return'<h2>Cast &amp; Crew</h2><div class="crow">'+list.map(p=>'<div class="cm"><div class="cmi"'+(p.img?' style="background-image:url('+esc(p.img)+')"':'')+'>'+(p.img?'':esc(initials(p.n)))+'</div><b>'+esc(p.n)+'</b><small>'+esc(p.ch||"")+'</small></div>').join("")+'</div>'}
-function moreHtml(i){const t=tm(i);if(!t||!t.rec||!t.rec.length)return"";
+function pgHtml(i){const m=CAT[i];if(isLive(m))return"";const d=dInfo(i),t=tm(i)||{},id=m.aid||m.id,im=/^tt\d+$/.test(id)?id:"";if(!d.cert&&!im)return"";
+return'<h2>Parents Guide</h2><div class="panel">'+(d.cert?'<p style="margin:0 0 8px"><span class="bx">'+esc(d.cert)+'</span> <span class="meta">US rating</span></p>':'')+((t.pgd&&t.pgd.length)?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">'+t.pgd.map(x=>'<span class="chip lock">'+esc(x)+'</span>').join("")+'</div>':'')+(im?'<button class="btn alt" style="margin:0" data-pg="'+im+'">Full guide on IMDb</button>':'')+'</div>'}
+const MLC={};
+async function moreLike(i){const m=CAT[i];if(!m)return;const id=m.aid||m.id,kind=isTv(m)?"series":"movie",g=(dInfo(i).genres||[])[0];if(!g)return;const k=kind+g;
+try{MLC[k]=MLC[k]||(await Ski.j("https://v3-cinemeta.strem.io/catalog/"+kind+"/top/genre="+encodeURIComponent(g)+".json")).metas||[]}catch(e){return}
+const el=document.getElementById("more");if(!el||view!==i)return;const L=MLC[k].filter(x=>x.id!==id).slice(0,14);if(!L.length)return;
+el.innerHTML='<h2>More Like This</h2><div class="row">'+L.map(x=>card(adoptM(x,kind))).join("")+'</div>'}
+function moreHtml(i){const t=tm(i);if(!t||!t.rec||!t.rec.length){setTimeout(()=>moreLike(i),50);return'<div id="more"></div>'}
 return'<h2>More Like This</h2><div class="row">'+t.rec.map((r,n)=>{const g=GRAD[(r.id||n)%6];return'<button class="card" data-rec="'+n+'"><div class="poster" style="'+(r.poster_path?'background:url(https://image.tmdb.org/t/p/w342'+r.poster_path+') center/cover':'background:linear-gradient(160deg,'+g[0]+','+g[1]+')')+'">'+(r.poster_path?'':'<b>'+esc(r.title||r.name||"")+'</b>')+'</div><div class="meta">'+esc(String(r.release_date||r.first_air_date||"").slice(0,4))+'</div></button>'}).join("")+'</div>'}
 function detail(){
 const i=view;setTimeout(()=>mdbRatings(i),0);
@@ -812,7 +821,7 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 +'<div class="dtacts"><button data-save>'+BM+'<span>'+(sv?"In Watchlist":"Add to Watchlist")+'</span></button>'+(live?'':'<button data-trailer>'+CL+'<span>Play Trailer</span></button>')+(tv||live?'':'<button data-mark>'+MK+'<span>'+(done?"Mark unwatched":"Mark watched")+'</span></button>')+'</div>'
 +(d.desc?'<button class="dtdesc" data-exp>'+esc(d.desc)+'</button>':'')
 +(d.cast.length&&!live?'<p class="dtstar">Starring: '+d.cast.slice(0,6).map(esc).join(", ")+'</p>':'')
-+(tv?episodesHtml(i):'')+peopleHtml(i)+moreHtml(i)
++(tv?episodesHtml(i):'')+peopleHtml(i)+pgHtml(i)+moreHtml(i)
 +(S.addons.length?'<div id="streams" hidden></div>':'')}
 
 function settings(){
@@ -858,6 +867,7 @@ document.addEventListener("click",e=>{
 const er=e.target.closest(".ep");if(er&&!e.target.closest(".epck")&&er.dataset.ep){const p=er.dataset.ep.split(":");playEp(+p[0],+p[1]);return}
 const el=e.target.closest("button");if(!el)return;const d=el.dataset;
 if(d.exp!==undefined){el.classList.toggle("open");return}
+if(d.pg!==undefined){window.open("https://www.imdb.com/title/"+d.pg+"/parentalguide","_blank");return}
 if(d.rec!==undefined){const t=tm(view),r=t&&t.rec&&t.rec[+d.rec];if(r){const i=adopt(r);STR=[];view=i;render();(document.getElementById("scr")||window).scrollTo(0,0);loadTmdb(i)}return}
 if(d.trailer!==undefined){const t=dInfo(view).trailer;if(t)showTrailer(t);else toast("No trailer available");return}
 if(d.epw!==undefined){const p=d.epw.split(":"),k=CAT[view].id+"|"+p[0]+"|"+p[1];if(S.eps[k]){delete S.eps[k];queue("unepisode:"+k)}else{S.eps[k]=1;queue("episode:"+k)}save();render();return}
