@@ -339,7 +339,7 @@ try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
 S.tmdb=S.tmdb||{on:false,key:""};S.mdb={key:"",lists:[]};S.hideCloud=true;S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
 S.debrids=[];
-S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.tab="home";S.eps=S.eps||{};S.teams=S.teams||[];S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
+S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.tab="home";S.upd=S.upd||{token:"",last:0};S.eps=S.eps||{};S.teams=S.teams||[];S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
 let view=null;
 const $=s=>document.querySelector(s);
@@ -792,6 +792,24 @@ window.__skiInstall=function(u){try{u=String(u||"").trim().replace(/^stremio:\/\
 if(window.__skiLast===u&&Date.now()-(window.__skiLastT||0)<20000)return;window.__skiLast=u;window.__skiLastT=Date.now();window.__skiPendingUrl=null;
 toast("Installing addon...");Ski.addon(u).then(a=>{if(S.addons.some(x=>x.url===a.url)){toast(a.name+" is already installed");return}S.addons.push(a);save();render();toast(a.name+" installed")}).catch(()=>toast("Couldn't load that addon"))}catch(e){}};
 if(window.__skiPendingUrl)setTimeout(()=>window.__skiInstall(window.__skiPendingUrl),800);
+const UPD={code:0,name:"",rel:null};
+function updPlug(){const C=window.Capacitor;return(C&&C.Plugins&&C.Plugins.SkiUpdate)||null}
+async function updVer(){const P=updPlug();if(!P||UPD.code)return;try{const v=await P.version();UPD.code=+v.code;UPD.name=v.name}catch(e){}}
+async function updCheck(manual){const P=updPlug(),st=t=>{const e=$("#updst");if(e)e.textContent=t};
+if(!P){if(manual)st("Updates only work in the installed Android app.");return}
+if(manual)st("Checking...");
+try{await updVer();const hd={Accept:"application/vnd.github+json"};if(S.upd.token)hd.Authorization="Bearer "+S.upd.token;
+const r=await fetch("https://api.github.com/repos/matidami05-ship-it/ski-media/releases/latest",{headers:hd});
+if(r.status===404||r.status===401||r.status===403){if(manual)st("Can't reach the update feed. Add a GitHub token below (read access to the ski-media repo).");return}
+if(!r.ok)throw 0;const j=await r.json(),n=parseInt(String(j.tag_name||"").replace(/\D/g,""))||0,nm=window.__SKI_FORCE_TV?"ski-media-tv.apk":"ski-media.apk",a=(j.assets||[]).find(x=>x.name===nm);
+UPD.rel=n>UPD.code&&a?{n,url:a.url,size:a.size}:null;S.upd.last=Date.now();save();
+if(UPD.rel){st("Version "+n+" is available ("+(a.size/1048576).toFixed(1)+" MB).");const b=$("#updgo");if(b)b.hidden=false;else if(!manual)toast("A new version is available. Open Settings to install it.")}
+else if(manual)st("You're up to date (version "+(UPD.code||"?")+").")}catch(e){if(manual)st("Couldn't check for updates.")}}
+async function updInstall(){const P=updPlug(),st=t=>{const e=$("#updst");if(e)e.textContent=t};if(!P||!UPD.rel)return;let hdl=null;
+try{hdl=await P.addListener("progress",p=>st("Downloading "+(p.total>0?Math.round(p.done/p.total*100)+"%":(p.done/1048576).toFixed(1)+" MB")))}catch(e){}
+try{st("Downloading...");await P.download({url:UPD.rel.url,token:S.upd.token||""});st("Opening installer...");const r=await P.install();st(r.needsPermission?"Turn on 'Allow from this source' in the screen that opened, come back, and tap Download & install again.":"Tap Install on the Android screen to finish.")}catch(e){st("Download failed: "+((e&&e.message)||e))}
+try{hdl&&hdl.remove&&hdl.remove()}catch(e){}}
+setTimeout(()=>{updVer().then(()=>{if(Date.now()-(S.upd.last||0)>12*3600e3)updCheck(false)})},6000);
 const AEP={};
 async function addonEps(i){const m=CAT[i];if(!isTv(m)||AEP[m.id]||epList(i).length)return;AEP[m.id]=1;
 const cm="https://v3-cinemeta.strem.io";let imdb="",vids=[];const oid=m.aid||m.id;
@@ -870,7 +888,11 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 +(S.addons.length?'<div id="streams" hidden></div>':'')}
 
 function settings(){
-return `<h2>Settings</h2><div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
+return `<h2>Settings</h2><div class="panel"><h3>App updates</h3><p>${UPD.name?"Version "+esc(UPD.name):"Checks for a newer Ski Media build, downloads it and opens the installer."}</p><p class="meta" id="updst"></p>
+<button class="btn" data-updchk>Check for updates</button> <button class="btn" id="updgo" data-updgo ${UPD.rel?"":"hidden"}>Download &amp; install</button>
+<label for="ugt">GitHub token (needed while the repo is private)</label><input id="ugt" type="password" autocomplete="off" value="${esc(S.upd.token||"")}" placeholder="Fine-grained token, Contents: read">
+</div>
+<div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
 <div class="panel"><h3>TV mode</h3><p>Layout for Android TV and other remote-control screens. Auto turns it on when there is no touchscreen.</p><label for="tvm">TV mode</label><select id="tvm"><option value="auto" ${(S.tvmode||"auto")==="auto"?"selected":""}>Auto</option><option value="on" ${S.tvmode==="on"?"selected":""}>On</option><option value="off" ${S.tvmode==="off"?"selected":""}>Off</option></select></div>
 <div class="panel"><h3>TMDB</h3><span class="status ${S.tmdb.on?'on':''}">${S.tmdb.on?'Linked':'Not linked'}</span>
 <p>Load posters, backdrops, cast, ratings and runtimes from The Movie Database.</p>
@@ -950,6 +972,8 @@ if(d.tmedit!==undefined){TMO=TMO?0:1;paintTeams();return}
 if(d.tm!==undefined){if(!S.teams.some(x=>x.toLowerCase()===d.tm.toLowerCase()))S.teams.push(d.tm);save();paintTeams();return}
 if(d.tmadd!==undefined){const i=$("#tmin"),v=(i&&i.value||"").trim();if(v&&!S.teams.some(x=>x.toLowerCase()===v.toLowerCase())){S.teams.push(v);save()}if(i)i.value="";paintTeams();return}
 if(d.tmrm!==undefined){S.teams.splice(+d.tmrm,1);save();paintTeams();return}
+if(d.updchk!==undefined){updCheck(true);return}
+if(d.updgo!==undefined){updInstall();return}
 if(d.rmdeb!==undefined){S.debrids.splice(+d.rmdeb,1);save();render();toast("Service removed");return}
 if(d.top!==undefined){const a=S.debrids.splice(+d.top,1);S.debrids.unshift(a[0]);save();render();toast("Primary service updated");return}
 if(d.addon!==undefined){const v=$("#ad").value.trim().replace(/^stremio:\/\//,"https://");if(!/^https?:\/\/.+manifest\.json$/i.test(v)){toast("Enter a full manifest.json URL");return}toast("Installing...");Ski.addon(v).then(a=>{S.addons.push(a);save();render();toast(a.name+" installed")}).catch(()=>toast("Couldn't load that addon"));return}
@@ -957,7 +981,7 @@ if(d.rm!==undefined){S.addons.splice(+d.rm,1);save();render();return}
 if(d.sync!==undefined){toast("Syncing...");doSync();return}
 });
 document.addEventListener("keydown",e=>{if(e.target.id==="q"&&e.key==="Enter"){addRecent(e.target.value);e.target.blur()}});
-document.addEventListener("change",e=>{if(e.target.id==="sv"){EP.vs=+e.target.value;render();return}if(e.target.id==="plr"){S.player=e.target.value;save();return}if(e.target.id==="hcl"){S.hideCloud=e.target.checked;CLD.mode="lib";save();toast(S.hideCloud?"Debrid cloud hidden":"Debrid cloud shown");return}if(e.target.id==="sn"||e.target.id==="en"){const m=CAT[view];if(e.target.id==="sn"){EP.s=+e.target.value||1;const f=(MC[m.aid||m.id]||[]).filter(x=>x.season===EP.s).map(x=>x.episode);EP.e=f.length?Math.min(...f):1}else EP.e=+e.target.value||1;STR=[];render();return}
+document.addEventListener("change",e=>{if(e.target.id==="ugt"){S.upd.token=e.target.value.trim();save();toast("Token saved");return}if(e.target.id==="sv"){EP.vs=+e.target.value;render();return}if(e.target.id==="plr"){S.player=e.target.value;save();return}if(e.target.id==="hcl"){S.hideCloud=e.target.checked;CLD.mode="lib";save();toast(S.hideCloud?"Debrid cloud hidden":"Debrid cloud shown");return}if(e.target.id==="sn"||e.target.id==="en"){const m=CAT[view];if(e.target.id==="sn"){EP.s=+e.target.value||1;const f=(MC[m.aid||m.id]||[]).filter(x=>x.season===EP.s).map(x=>x.episode);EP.e=f.length?Math.min(...f):1}else EP.e=+e.target.value||1;STR=[];render();return}
 if(e.target.id==="sc"){S.simkl.scrobble=e.target.checked;save()}});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){clearTimeout(SQT);const v=e.target.value;SQT=setTimeout(()=>sportsFind(v),400);return}if(e.target.id==="q"){Q=e.target.value;show();tsearch(Q)}});
 render();
