@@ -320,7 +320,7 @@ return `<p>${esc(t.ov||m.d)}</p>
 <div class="tags">${g.map(v=>`<span class="chip lock">${esc(v)}</span>`).join("")}</div>
 <h2>Cast and crew</h2><p class="meta" style="margin:0">Directed by <b style="color:var(--snow)">${esc(t.dir||x.dir)}</b></p>
 <div class="cast">${cast.map(p=>`<div class="who"><div class="av">${p.img?`<img src="${esc(p.img)}" alt="">`:esc(p.n.split(" ").map(w=>w[0]).slice(0,2).join(""))}</div>${esc(p.n)}</div>`).join("")}</div>
-<p class="note">${t.r?"Details from TMDB.":"Sample details. Link TMDB in Settings for live data."} This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`}
+<p class="note">${t.r?"Details from your addons.":"Sample details. Link TMDB in Settings for live data."} This product uses the TMDB API but is not endorsed or certified by TMDB.</p>`}
 const SRC=[
 {n:"Public Domain Archive",q:"1080p",s:"Direct stream",k:"direct"},
 {n:"Community Addon · 1080p",q:"1080p",s:"Debrid cached",k:"cached"},
@@ -332,8 +332,8 @@ const PROVIDERS=["Real-Debrid","AllDebrid","Premiumize","TorBox","Debrid-Link"];
 let S;
 try{S=JSON.parse(localStorage.getItem("ski")||"null")}catch(e){S=null}
 S=S||{tab:"home",watched:{},progress:{},watchlist:[],simkl:{on:false,token:"",scrobble:true},debrid:{on:false,prov:"Real-Debrid",token:""},addons:[],queue:[]};
-S.tmdb=S.tmdb||{on:false,key:""};S.mdb=S.mdb||{key:"",lists:[]};S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
-S.debrids=S.debrids||(S.debrid&&S.debrid.on?[{prov:S.debrid.prov,token:S.debrid.token}]:[]);
+S.tmdb=S.tmdb||{on:false,key:""};S.mdb={key:"",lists:[]};S.tmdb={on:false,key:""};S.hideCloud=true;S.simkl={on:false,token:"",scrobble:false};S.queue=[];if(S.progress&&JSON.stringify(S.progress)==="{\"0\":0.15,\"2\":0.4}")S.progress={};
+S.debrids=[];
 S.addons=(S.addons||[]).filter(a=>a&&typeof a==="object");S.eps=S.eps||{};S.sp=S.sp||{};S.recent=S.recent||[];S.last=S.last||{};S.player=S.player||"vlc";S.cv=S.cv||{home:{},sports:Object.assign({},S.sp)};S.ord=S.ord||{home:[],sports:[]};S.iptv=S.iptv||{lists:[],fav:[],act:0,grp:"All"};S.pos=S.pos||{};if(!S.pl2){S.pl2=1;if(S.player==="vlc")S.player="ski"}S.extra=S.extra||[];S.extra.forEach(o=>{CAT.push(o);META[o.id]={r:0,rt:0,gen:[],dir:"Unknown",cast:[]}});
 function save(){try{localStorage.setItem("ski",JSON.stringify(S))}catch(e){}}
 let view=null;
@@ -355,8 +355,7 @@ function recentHtml(){if(!S.recent.length)return"";return `<div style="display:f
 function hits(q){q=q.trim().toLowerCase();if(!q)return[];return CAT.map((m,i)=>i).filter(i=>{const m=CAT[i],x=META[m.id];return[m.t,m.y,x.dir,x.cast.join(" "),x.gen.join(" ")].join(" ").toLowerCase().includes(q)})}
 function results(){const q=Q.trim();if(!q)return `<p class="meta">Search by title, year, director, actor or genre.</p>${recentHtml()}<h2>Browse all</h2><div class="grid">${CAT.map((m,i)=>i).filter(i=>!CAT[i].tid).map(i=>card(i)).join("")}</div>`;
 const h=hits(Q).filter(i=>!CAT[i].tid);let out=h.length?`<h2>In your catalog</h2><div class="grid">${h.map(i=>card(i)).join("")}</div>`:"";
-if(!S.tmdb.on)out+=`<div class="panel" style="margin-top:16px"><h3>Search TMDB</h3><p>Link your TMDB API key in Settings to search every movie and show.</p><button class="btn alt" data-tab="settings">Open settings</button></div>`;
-else if(TS==="loading")out+=`<p class="meta">Searching TMDB...</p>`;
+if(0){}else if(TS==="loading")out+=`<p class="meta">Searching TMDB...</p>`;
 else if(TS==="error")out+=`<div class="panel" style="margin-top:16px"><h3>Can't reach TMDB</h3><p>The search request failed. Check that your API key is correct and that you're online. Previews hosted on claude.ai also block requests to other sites.</p></div>`;
 else if(TS==="done")out+=TR.length?`<h2>From TMDB</h2><div class="grid">${TR.map(i=>card(i)).join("")}</div>`:`<p class="meta">TMDB has no matches for "${esc(Q)}".</p>`;
 return out||`<p class="meta">No matches for "${esc(Q)}". Try a title, actor or genre.</p>`}
@@ -518,7 +517,7 @@ const se=t.match(/\u{1F464}\s*(\d+)/u);if(se)sc+=Math.min(+se[1],200)/10;
 return sc}
 async function resolveSource(s,onSt){let url=/^https?:/i.test(s.url||"")?s.url:"",tc="",prov=s.addon||"";
 if(!url){const hash=s.infoHash||((s.url||"").match(/btih:([a-f0-9]{40})/i)||[])[1];if(!hash)throw new Error("This source type isn't supported yet");
-if(!S.debrids.length)throw new Error("Link a debrid account in Settings first");
+if(!S.debrids.length)throw new Error("This source needs a debrid-enabled addon. Configure your debrid in the addon itself");
 const sup=S.debrids.filter(x=>x.prov==="Real-Debrid"||x.prov==="TorBox");if(!sup.length)throw new Error("Only Real-Debrid and TorBox can play streams for now");
 let lastErr=null;for(const d of sup){try{prov=d.prov;
 if(d.prov==="TorBox"){const r=await Ski.tb.resolve(d.token,hash,s.fileIdx,t=>onSt("TorBox: "+t));url=r.url;tc=""}
@@ -544,10 +543,10 @@ if(view===vi)mountPlayer(p,{orig:r.url,tc:r.tc||"",info:streamInfo(r.s),prov:r.p
 async function startPlay(s,vi){const p=$("#pl");p.hidden=false;p.style.cssText="";p.textContent="Preparing...";
 try{const r=await resolveSource(s,t=>{if(view===vi)p.textContent=t});if(view!==vi)return;await launch(r,vi,p)}catch(err){if(view===vi)p.textContent=err.message}}
 async function playBest(vi){const p=$("#pl");p.hidden=false;p.style.cssText="";p.textContent="Finding the best source...";
-{const m0=CAT[vi];if(isTv(m0)&&!/^tt\d+$/.test(m0.aid||m0.id)){p.textContent=S.tmdb.on?"Still looking up this series. Try again in a moment.":"Link TMDB in Settings so this series can be found.";if(S.tmdb.on)loadTmdb(vi);return}}
+{const m0=CAT[vi];if(isTv(m0)&&!/^tt\d+$/.test(m0.aid||m0.id)){p.textContent=S.tmdb.on?"Still looking up this series. Try again in a moment.":"Open this series from a catalog addon so it can be found.";if(S.tmdb.on)loadTmdb(vi);return}}
 if(!STR.length)await loadStreams();if(view!==vi)return;
 const c=STR.filter(x=>scoreStream(x)>-900).slice(0,4);
-if(!c.length){p.textContent="No playable sources found. Check your addons and your debrid account in Settings.";return}
+if(!c.length){p.textContent="No playable sources found. Check your addons in Settings.";return}
 let last="";for(const s of c){try{const r=await resolveSource(s,t=>{if(view===vi)p.textContent=t});if(view!==vi)return;await launch(r,vi,p);return}
 catch(err){last=err.message;if(/Settings|Only Real-Debrid|rejected/.test(last))break;if(view===vi)p.textContent="That source failed ("+last+"). Trying the next one..."}}
 if(view===vi)p.textContent="No source worked: "+last}
@@ -592,7 +591,7 @@ function isLive(m){return !m.tid&&["tv","channel","events","sports"].includes(m.
 let EP={i:-1,s:1,e:1};const MC={};
 async function loadMeta(m){for(const a of S.addons.filter(a=>a.res.includes("meta"))){try{const r=await Ski.j(`${a.url}/meta/series/${encodeURIComponent(m.aid||m.id)}.json`);const v=((r.meta&&r.meta.videos)||[]).filter(x=>x.season>0&&x.episode>0);if(v.length)return v}catch(e){}}return[]}
 async function loadEps(){const i=view,m=CAT[i],el=$("#eps");if(!el)return;const id=m.aid||m.id;
-if(!/^tt\d+$/.test(id)){el.innerHTML=S.tmdb.on?'<p class="meta">Looking up this series...</p>':'<p class="meta">Link TMDB in Settings, or open this series from a catalog addon, to find its sources.</p>';if(S.tmdb.on)loadTmdb(i);return}
+if(!/^tt\d+$/.test(id)){el.innerHTML=S.tmdb.on?'<p class="meta">Looking up this series...</p>':'<p class="meta">Open this series from a catalog addon to find its sources.</p>';if(S.tmdb.on)loadTmdb(i);return}
 if(!(id in MC))MC[id]=await loadMeta(m);if(view!==i||!$("#eps"))return;
 const v=MC[id],ss=[...new Set(v.map(x=>x.season))].sort((a,b)=>a-b);
 if(EP.i!==i){EP={i,s:ss[0]||1,e:1};if(v.length)EP.e=Math.min(...v.filter(x=>x.season===EP.s).map(x=>x.episode))}
@@ -757,7 +756,7 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 +(d.genres.length&&!live?'<div class="dtgen">'+d.genres.slice(0,3).map(esc).join(" ")+'</div>':'')
 +'<div class="dtmeta">'+(live?'<span>Live</span>':'')+(d.year&&!live?'<span>'+esc(d.year)+'</span>':'')+(d.cert?'<span class="bx">'+esc(d.cert)+'</span>':'')+(d.rt?'<span>'+d.rt+'m</span>':'')+(d.rating?'<span class="bx">'+(+d.rating).toFixed(1)+'</span>':'')+'</div><div id="mdr" class="dtmeta"></div></div>'
 +'<button class="playbig" data-watch><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg><span>'+label+'</span></button><div id="pl" class="pst" hidden></div>'
-+(S.addons.length?'':'<p class="meta" style="text-align:center;margin:10px 0 0">Install an addon and link a debrid account in Settings to start playing.</p>')
++(S.addons.length?'':'<p class="meta" style="text-align:center;margin:10px 0 0">Install a Stremio addon in Settings to start playing.</p>')
 +'<div class="dtacts"><button data-save>'+BM+'<span>'+(sv?"In Watchlist":"Add to Watchlist")+'</span></button>'+(live?'':'<button data-trailer>'+CL+'<span>Play Trailer</span></button>')+(tv||live?'':'<button data-mark>'+MK+'<span>'+(done?"Mark unwatched":"Mark watched")+'</span></button>')+'</div>'
 +(d.desc?'<button class="dtdesc" data-exp>'+esc(d.desc)+'</button>':'')
 +(d.cast.length&&!live?'<p class="dtstar">Starring: '+d.cast.slice(0,6).map(esc).join(", ")+'</p>':'')
@@ -765,24 +764,8 @@ return '<div class="dthero" style="'+bg+'"><button class="dtback" data-back aria
 +(S.addons.length?'<div id="streams" hidden></div>':'')}
 
 function settings(){
-return `<h2>Settings</h2><div class="panel"><h3>Debrid accounts</h3><span class="status ${S.debrids.length?'on':''}">${S.debrids.length?S.debrids.length+' linked':'Not linked'}</span>
-<p>Link as many services as you like. Real-Debrid and TorBox play streams (the first in your list is tried first). Debrid cloud uses Real-Debrid. The others are saved for later.</p>
-${S.debrids.map((d,n)=>`<div class="src"><div><b>${esc(d.prov)}</b><small>${n===0?'Primary':'Backup'}</small></div>${n?`<button class="btn alt" style="margin:0;padding:8px 12px" data-top="${n}">Make primary</button>`:''}<button class="btn alt" style="margin:0;padding:8px 12px" data-rmdeb="${n}">Remove</button></div>`).join("")}
-${(f=>f.length?`<label for="dp">Add a service</label><select id="dp">${f.map(p=>`<option>${p}</option>`).join("")}</select>
-<label for="dt">API token</label><input id="dt" type="password" autocomplete="off" placeholder="Paste your API token">
-<button class="btn" data-link="debrid">Link account</button>`:'<p class="meta">All supported services are linked.</p>')(PROVIDERS.filter(p=>!S.debrids.some(d=>d.prov===p)))}</div>
-<div class="panel"><h3>Debrid cloud</h3><label style="display:flex;gap:10px;align-items:center"><input type="checkbox" id="hcl" ${S.hideCloud?"checked":""} style="width:auto"> Hide Debrid cloud from the Library</label></div>
-<div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
+return `<h2>Settings</h2><div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
 <div class="panel"><h3>TV mode</h3><p>Layout for Android TV and other remote-control screens. Auto turns it on when there is no touchscreen.</p><label for="tvm">TV mode</label><select id="tvm"><option value="auto" ${(S.tvmode||"auto")==="auto"?"selected":""}>Auto</option><option value="on" ${S.tvmode==="on"?"selected":""}>On</option><option value="off" ${S.tvmode==="off"?"selected":""}>Off</option></select></div>
-<div class="panel"><h3>TMDB</h3><span class="status ${S.tmdb.on?'on':''}">${S.tmdb.on?'Linked':'Not linked'}</span>
-<p>Load posters, backdrops, cast, ratings and runtimes from The Movie Database.</p>
-<label for="tk">TMDB API key</label><input id="tk" type="password" autocomplete="off" value="${esc(S.tmdb.key)}" placeholder="Paste your API key">
-<button class="btn" data-link="tmdb">${S.tmdb.on?'Update':'Link TMDB'}</button> ${S.tmdb.on?'<button class="btn alt" data-unlink="tmdb">Unlink</button>':''}</div>
-<div class="panel"><h3>MDBList</h3><span class="status ${S.mdb.key?'on':''}">${S.mdb.key?'Linked':'Not linked'}</span>
-<p>Shows IMDb, Rotten Tomatoes, Metacritic and Letterboxd ratings on title pages, and lets you add MDBList lists as rows on Home.</p>
-<label for="mk">MDBList API key</label><input id="mk" type="password" autocomplete="off" value="${esc(S.mdb.key)}" placeholder="Paste your API key">
-<button class="btn" data-link="mdb">${S.mdb.key?'Update':'Link MDBList'}</button> ${S.mdb.key?'<button class="btn alt" data-unlink="mdb">Unlink</button>':''}
-${S.mdb.key?`<label for="ml">Add a list</label><input id="ml" placeholder="https://mdblist.com/lists/username/list-name" inputmode="url"><button class="btn" data-mdbadd>Add list</button>${S.mdb.lists.map((l,n)=>`<div class="src"><div><b>${esc(l.name)}</b><small>${esc(l.u)}</small></div><button class="btn alt" style="margin:0;padding:8px 12px" data-mdbrm="${n}">Remove</button></div>`).join("")}`:''}</div>
 <div class="panel"><h3>Addons</h3><p>Paste the manifest URL of an addon you want to install. Ski Media uses the Stremio addon format.</p>
 <input id="ad" placeholder="https://example.com/manifest.json" inputmode="url">
 <button class="btn" data-addon>Install addon</button>
