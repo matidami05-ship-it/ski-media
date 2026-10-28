@@ -1091,6 +1091,9 @@ jobs:
               private ProgressBar spinner;
               private TextView speedBtn, fitBtn;
               private String wantEp = null;
+          private boolean hasNextF = false, askF = false, asked = false;
+          private FrameLayout rootF, endCard;
+          private int cd = 0;
           private JSONArray episodes = null;
           private int curS = 0, curE = 0;
           private boolean ended = false, wantNext = false, dragging = false, zoom = false;
@@ -1183,6 +1186,8 @@ jobs:
                   String sub = getIntent().getStringExtra("sub");
                   String badgesJson = getIntent().getStringExtra("badges");
                   boolean hasNext = getIntent().getBooleanExtra("hasNext", false);
+          hasNextF = hasNext;
+          askF = getIntent().getBooleanExtra("ask", false);
           curS = getIntent().getIntExtra("curS", 0);
           curE = getIntent().getIntExtra("curE", 0);
           try {
@@ -1211,6 +1216,56 @@ jobs:
                   root.addView(overlay, new FrameLayout.LayoutParams(
                       FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
                   root.setOnClickListener(v -> showControls());
+          rootF = root;
+          try {
+              String pgj = getIntent().getStringExtra("pg");
+              if (pgj != null && !pgj.isEmpty() && startPos < 30000) {
+                  JSONArray pa = new JSONArray(pgj);
+                  if (pa.length() > 0) {
+                      final LinearLayout card = new LinearLayout(this);
+                      card.setOrientation(LinearLayout.VERTICAL);
+                      GradientDrawable cg = new GradientDrawable();
+                      cg.setColor(0xCC000000);
+                      cg.setCornerRadius(dp(14));
+                      card.setBackground(cg);
+                      card.setPadding(dp(18), dp(14), dp(22), dp(14));
+                      TextView ph = label("Parents guide", 13, 0xFFB8C0CC, true);
+                      ph.setPadding(0, 0, 0, dp(6));
+                      card.addView(ph);
+                      for (int i = 0; i < pa.length(); i++) {
+                          JSONObject po = pa.getJSONObject(i);
+                          String lv = po.optString("l", "");
+                          int col = 0xFF2EA36B;
+                          String ll = lv.toLowerCase();
+                          if (ll.equals("mild")) col = 0xFF9BD14B;
+                          else if (ll.equals("moderate")) col = 0xFFF5C518;
+                          else if (ll.equals("severe")) col = 0xFFE0392B;
+                          LinearLayout row = new LinearLayout(this);
+                          row.setOrientation(LinearLayout.HORIZONTAL);
+                          row.setGravity(Gravity.CENTER_VERTICAL);
+                          row.setPadding(0, dp(4), 0, dp(4));
+                          View bar = new View(this);
+                          GradientDrawable bg2 = new GradientDrawable();
+                          bg2.setColor(col);
+                          bg2.setCornerRadius(dp(3));
+                          bar.setBackground(bg2);
+                          row.addView(bar, new LinearLayout.LayoutParams(dp(5), dp(22)));
+                          TextView t = label(po.optString("n", "") + ":  " + lv, 15, Color.WHITE, false);
+                          t.setPadding(dp(12), 0, 0, 0);
+                          row.addView(t);
+                          card.addView(row);
+                      }
+                      FrameLayout.LayoutParams cp2 = new FrameLayout.LayoutParams(
+                          FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.START | Gravity.BOTTOM);
+                      cp2.setMargins(dp(34), 0, 0, dp(130));
+                      root.addView(card, cp2);
+                      card.setAlpha(0f);
+                      card.animate().alpha(1f).setDuration(400).start();
+                      handler.postDelayed(() -> card.animate().alpha(0f).setDuration(600).withEndAction(() -> card.setVisibility(View.GONE)).start(), 7000);
+                  }
+              }
+          } catch (Exception ignored) {
+          }
 
                   // top and bottom shading
                   View topShade = new View(this);
@@ -1418,7 +1473,8 @@ jobs:
                           spinner.setVisibility(state == Player.STATE_BUFFERING ? View.VISIBLE : View.GONE);
                           if (state == Player.STATE_ENDED) {
                               ended = true;
-                              finish();
+                              if (hasNextF) showEndCard();
+                              else finish();
                           }
                       }
 
@@ -1525,6 +1581,58 @@ jobs:
                   return sb.toString();
               }
 
+              private void showEndCard() {
+                  if (endCard != null) return;
+                  overlay.setVisibility(View.GONE);
+                  endCard = new FrameLayout(this);
+                  endCard.setBackgroundColor(0xE6000000);
+                  endCard.setClickable(true);
+                  LinearLayout box = new LinearLayout(this);
+                  box.setOrientation(LinearLayout.VERTICAL);
+                  box.setGravity(Gravity.CENTER_HORIZONTAL);
+                  final TextView head = label(askF ? "Are you still watching?" : "Up next", 26, Color.WHITE, true);
+                  final TextView sub2 = label(askF ? "You've watched a few episodes in a row." : "", 16, 0xFFB8C0CC, false);
+                  box.addView(head);
+                  box.addView(sub2);
+                  LinearLayout btns = new LinearLayout(this);
+                  btns.setOrientation(LinearLayout.HORIZONTAL);
+                  btns.setPadding(0, dp(22), 0, 0);
+                  final TextView go = action(askF ? "Continue watching" : "Play now");
+                  final TextView stop = action(askF ? "Exit" : "Cancel");
+                  go.setOnClickListener(v -> {
+                      asked = askF;
+                      wantNext = true;
+                      finish();
+                  });
+                  stop.setOnClickListener(v -> finish());
+                  btns.addView(go);
+                  btns.addView(stop);
+                  box.addView(btns);
+                  endCard.addView(box, new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+                  rootF.addView(endCard, new FrameLayout.LayoutParams(
+                      FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                  go.requestFocus();
+                  if (!askF) {
+                      cd = 10;
+                      final Runnable tick = new Runnable() {
+                          @Override
+                          public void run() {
+                              if (isFinishing()) return;
+                              sub2.setText("Next episode starts in " + cd + "s");
+                              if (cd <= 0) {
+                                  wantNext = true;
+                                  finish();
+                                  return;
+                              }
+                              cd--;
+                              handler.postDelayed(this, 1000);
+                          }
+                      };
+                      handler.post(tick);
+                  }
+              }
+          
               private void pickEpisode() {
                   if (episodes == null) return;
                   final int n = episodes.length();
@@ -1661,6 +1769,7 @@ jobs:
                   }
                   r.putExtra("ended", ended);
                   r.putExtra("next", wantNext);
+          r.putExtra("asked", asked);
           if (wantEp != null) r.putExtra("ep", wantEp);
                   if (error != null) r.putExtra("error", error);
                   setResult(RESULT_OK, r);
@@ -1712,6 +1821,10 @@ jobs:
                   Double pos = call.getDouble("pos", 0.0);
                   intent.putExtra("pos", pos == null ? 0L : (long) pos.doubleValue());
                   intent.putExtra("sub", call.getString("sub", ""));
+          JSArray pgA = call.getArray("pg");
+          if (pgA != null) intent.putExtra("pg", pgA.toString());
+          Boolean askB = call.getBoolean("ask", false);
+          intent.putExtra("ask", askB != null && askB);
           JSArray eps = call.getArray("episodes");
           if (eps != null) intent.putExtra("episodes", eps.toString());
           intent.putExtra("curS", call.getInt("s", 0));
@@ -1735,6 +1848,7 @@ jobs:
                       ret.put("duration", data.getLongExtra("duration", 0L));
                       ret.put("ended", data.getBooleanExtra("ended", false));
                       ret.put("next", data.getBooleanExtra("next", false));
+          ret.put("asked", data.getBooleanExtra("asked", false));
           String epx = data.getStringExtra("ep");
           if (epx != null) ret.put("ep", epx);
                       String err = data.getStringExtra("error");

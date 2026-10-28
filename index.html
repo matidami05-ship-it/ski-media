@@ -552,9 +552,10 @@ S.progress[vi]=Math.max(S.progress[vi]||0,.05);if(tv)S.last[m.id]={s:cur.s,e:cur
 const onRes=res=>{if(res&&res.duration>0)savePos(vi,cur.s,cur.e,res.position/1000,res.duration/1000,res.ended);if(view===vi)render()};
 if(useSki()){let subs=[];try{subs=await Promise.race([fetchSubs(vi,cur),new Promise(x=>setTimeout(()=>x([]),3500))])}catch(e){}
 if(view!==vi&&view!==null){}
-try{if(view===vi&&p)p.textContent="Starting the player...";const si=streamInfo(r.s),nx=tv?nextEp(vi,cur):null,bd=[si.q,si.size,String(r.prov||"").toLowerCase()].filter(Boolean);
-const res=await skiP().play({url:r.url,title:m.t,sub:epLine(vi,cur),badges:bd,next:!!nx,s:cur.s,e:cur.e,episodes:tv?epList(vi).slice(0,400).map(x=>({s:x.season,e:x.episode,t:x.title||x.name||""})):[],pos:pos*1000,subs:subs.slice(0,10).map(x=>({url:x.url,lang:x.lang}))});
-if(res&&res.next&&nx){onRes(res);playEpisode(vi,nx.s,nx.e);return}
+try{if(view===vi&&p)p.textContent="Starting the player...";let pgl=[];if(!pos){try{pgl=await Promise.race([pgGet(m.aid||m.id),new Promise(x=>setTimeout(()=>x([]),2500))])}catch(e){}}
+const si=streamInfo(r.s),nx=tv?nextEp(vi,cur):null,bd=[si.q,si.size,String(r.prov||"").toLowerCase()].filter(Boolean);
+const res=await skiP().play({url:r.url,title:m.t,sub:epLine(vi,cur),badges:bd,next:!!nx,ask:(window.__binge||0)>=3,pg:pgl.map(x=>({n:x.n,l:x.l})),s:cur.s,e:cur.e,episodes:tv?epList(vi).slice(0,400).map(x=>({s:x.season,e:x.episode,t:x.title||x.name||""})):[],pos:pos*1000,subs:subs.slice(0,10).map(x=>({url:x.url,lang:x.lang}))});
+if(res&&res.next&&nx){onRes(res);if(res.ended){window.__binge=res.asked?0:(window.__binge||0)+1}else window.__binge=0;playEpisode(vi,nx.s,nx.e);return}
 if(res&&res.ep){const q=res.ep.split(":");onRes(res);playEpisode(vi,+q[0],+q[1]);return}
 if(res&&res.error){toast("Ski Player couldn't play this ("+String(res.error).replace(/^ERROR_CODE_/,"").toLowerCase().replace(/_/g," ")+"). Trying VLC.")}else{onRes(res);return}}catch(e){toast("Ski Player isn't in this build yet. Trying VLC.")}}
 if(useVlc()){try{const pr=openVlc(r.url,label,pos*1000).then(onRes);await Promise.race([pr,new Promise(x=>setTimeout(x,700))]);pr.catch(()=>{});if(view===vi)launchedUI(p,r,vi);return}catch(e){const mm=String(e&&e.message||e);toast(/not installed/i.test(mm)?"VLC isn't installed. Get it from Google Play. Using the web player for now.":/not implemented|not available/i.test(mm)?"This app build has no VLC support yet. Using the web player.":"Couldn't open VLC ("+mm.slice(0,60)+"). Using the web player.")}}
@@ -808,7 +809,7 @@ if(/^tt\d+$/.test(id)&&!(id in MT)){await fetchMeta(m);if(view!==i)return;
 if(isTv(m)&&!S.last[m.id]&&EP.i===i){const l=epList(i);if(l.length){EP.s=l[0].season;EP.e=l[0].episode}}
 const pl=$("#pl");if(!pl||pl.hidden)softRender();return}
 if(S.addons.length)loadStreams()}
-function playEp(s,e){const i=view;EP.i=i;EP.s=s;EP.e=e;EP.vs=s;S.last[CAT[i].id]={s,e};save();STR=[];render();
+function playEp(s,e){window.__binge=0;const i=view;EP.i=i;EP.s=s;EP.e=e;EP.vs=s;S.last[CAT[i].id]={s,e};save();STR=[];render();
 try{(document.getElementById("scr")||window).scrollTo({top:0,behavior:"smooth"})}catch(x){}playBest(i)}
 function initials(n){return String(n||"").split(/\s+/).map(w=>w[0]||"").join("").slice(0,2).toUpperCase()}
 function peopleHtml(i){const m=CAT[i],id=m.aid||m.id,t=tm(i)||{},mt=MT[id]||{};let list=[];
@@ -816,8 +817,27 @@ if(t.cast&&t.cast.length)list=t.cast.concat(t.crew||[]);
 else list=(mt.cast||[]).map(n=>({n,ch:"",img:""})).concat((mt.director||[]).map(n=>({n,ch:"Director",img:""})));
 if(!list.length)return"";
 return'<h2>Cast &amp; Crew</h2><div class="crow">'+list.map(p=>'<div class="cm"><div class="cmi"'+(p.img?' style="background-image:url('+esc(p.img)+')"':'')+'>'+(p.img?'':esc(initials(p.n)))+'</div><b>'+esc(p.n)+'</b><small>'+esc(p.ch||"")+'</small></div>').join("")+'</div>'}
+const PGN=["Sex & Nudity","Violence & Gore","Profanity","Alcohol, Drugs & Smoking","Frightening & Intense Scenes"];
+function parsePG(html){const out=[],seen={};const lab={SEX_NUDITY:PGN[0],VIOLENCE:PGN[1],PROFANITY:PGN[2],ALCOHOL:PGN[3],FRIGHTENING:PGN[4]};
+const lv=s=>{const m=String(s||"").match(/none|mild|moderate|severe/i);return m?m[0].toLowerCase():""};
+const add=(n,l)=>{l=lv(l);n=String(n||"");if(!l||!n||seen[n])return;seen[n]=1;out.push({n,l:l[0].toUpperCase()+l.slice(1)})};
+const lvOf=o=>{if(typeof o.severity==="string")return o.severity;const s=o.severitySummary||o.severity||{};if(typeof s==="string")return s;if(s.topVotedSeverity)return typeof s.topVotedSeverity==="string"?s.topVotedSeverity:(s.topVotedSeverity.text||s.topVotedSeverity.id||"");
+const a=s.votedSeverities||s.severities||s.votes||[];let best=null,bn=-1;(Array.isArray(a)?a:[]).forEach(x=>{if(!x||typeof x!=="object")return;let l="",n=0;Object.keys(x).forEach(k=>{const v=x[k];if(typeof v==="string"&&lv(v)&&!l)l=v;else if(typeof v==="object"&&v&&lv(v.text||v.id||"")&&!l)l=v.text||v.id;else if(typeof v==="number"&&v>n)n=v});if(l&&n>bn){bn=n;best=l}});return best||""};
+const walk=(o,d)=>{if(!o||typeof o!=="object"||d>14)return;if(Array.isArray(o)){o.forEach(x=>walk(x,d+1));return}
+if(o.category&&typeof o.category==="object"){const id=String(o.category.id||"").toUpperCase(),nm=o.category.text||lab[Object.keys(lab).find(k=>id.indexOf(k)===0)]||"";const l=lvOf(o);if(nm&&l)add(nm.replace(/:$/,""),l)}
+Object.keys(o).forEach(k=>walk(o[k],d+1))};
+const m=html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);if(m){try{walk(JSON.parse(m[1]),0)}catch(e){}}
+if(out.length<3){const text=html.replace(/<[^>]+>/g," ").replace(/&amp;/g,"&").replace(/&#x27;|&#39;/g,"'");PGN.forEach(n=>{const k=text.indexOf(n+":");if(k>=0){const mm=text.slice(k+n.length+1,k+n.length+40).match(/None|Mild|Moderate|Severe/);if(mm)add(n,mm[0])}})}
+const ord=PGN.map(x=>x.toLowerCase());out.sort((a,b)=>{const x=ord.findIndex(n=>a.n.toLowerCase().indexOf(n.slice(0,6))===0),y=ord.findIndex(n=>b.n.toLowerCase().indexOf(n.slice(0,6))===0);return(x<0?9:x)-(y<0?9:y)});return out.slice(0,6)}
+async function pgGet(imdb){S.pg=S.pg||{};const c=S.pg[imdb];if(c&&c.c&&c.c.length&&Date.now()-c.ts<30*864e5)return c.c;if(!/^tt\d+$/.test(imdb))return[];
+const url="https://www.imdb.com/title/"+imdb+"/parentalguide/";let html="";
+try{const C=window.Capacitor,H=C&&C.Plugins&&C.Plugins.CapacitorHttp;if(Ski.native()&&H){const r=await H.get({url,headers:{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36","Accept-Language":"en-US,en;q=0.9",Accept:"text/html"},responseType:"text"});html=typeof r.data==="string"?r.data:JSON.stringify(r.data||"")}else html=await(await Ski.px(url)).text()}catch(e){return[]}
+const out=parsePG(html);if(out.length){S.pg[imdb]={ts:Date.now(),c:out};save()}return out}
+const PGCOL={none:"#2ea36b",mild:"#9bd14b",moderate:"#f5c518",severe:"#e0392b"};
+async function loadPG(i){const m=CAT[i],id=m.aid||m.id;const c=await pgGet(id);const el=document.getElementById("pgbox");if(!el||view!==i)return;
+el.innerHTML=c.length?c.map(x=>'<div style="display:flex;align-items:center;gap:10px;padding:7px 0"><i style="width:5px;height:22px;border-radius:3px;background:'+PGCOL[x.l.toLowerCase()]+'"></i><span><b>'+esc(x.n)+':</b> '+esc(x.l)+'</span></div>').join(""):'<p class="meta" style="margin:0">Detailed guide isn\'t available for this title.</p>'}
 function pgHtml(i){const m=CAT[i];if(isLive(m))return"";const d=dInfo(i),t=tm(i)||{},id=m.aid||m.id,im=/^tt\d+$/.test(id)?id:"";if(!d.cert&&!im)return"";
-return'<h2>Parents Guide</h2><div class="panel">'+(d.cert?'<p style="margin:0 0 8px"><span class="bx">'+esc(d.cert)+'</span> <span class="meta">US rating</span></p>':'')+((t.pgd&&t.pgd.length)?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">'+t.pgd.map(x=>'<span class="chip lock">'+esc(x)+'</span>').join("")+'</div>':'')+(im?'<button class="btn alt" style="margin:0" data-pg="'+im+'">Full guide on IMDb</button>':'')+'</div>'}
+return'<h2>Parents Guide</h2><div class="panel">'+(d.cert?'<p style="margin:0 0 8px"><span class="bx">'+esc(d.cert)+'</span> <span class="meta">US rating</span></p>':'')+((t.pgd&&t.pgd.length)?'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">'+t.pgd.map(x=>'<span class="chip lock">'+esc(x)+'</span>').join("")+'</div>':'')+(im?'<div id="pgbox"><p class="meta" style="margin:0">Loading guide...</p></div>':'')+'</div>'+(im?(setTimeout(()=>loadPG(i),60),''):'')}
 const MLC={};
 async function moreLike(i){const m=CAT[i];if(!m)return;const id=m.aid||m.id,kind=isTv(m)?"series":"movie",g=(dInfo(i).genres||[])[0];if(!g)return;const k=kind+g;
 try{MLC[k]=MLC[k]||(await Ski.j("https://v3-cinemeta.strem.io/catalog/"+kind+"/top/genre="+encodeURIComponent(g)+".json")).metas||[]}catch(e){return}
@@ -890,7 +910,6 @@ document.addEventListener("click",e=>{
 const er=e.target.closest(".ep");if(er&&!e.target.closest(".epck")&&er.dataset.ep){const p=er.dataset.ep.split(":");playEp(+p[0],+p[1]);return}
 const el=e.target.closest("button");if(!el)return;const d=el.dataset;
 if(d.exp!==undefined){el.classList.toggle("open");return}
-if(d.pg!==undefined){window.open("https://www.imdb.com/title/"+d.pg+"/parentalguide","_blank");return}
 if(d.rec!==undefined){const t=tm(view),r=t&&t.rec&&t.rec[+d.rec];if(r){const i=adopt(r);STR=[];view=i;render();(document.getElementById("scr")||window).scrollTo(0,0);loadTmdb(i)}return}
 if(d.trailer!==undefined){const t=dInfo(view).trailer;if(t)showTrailer(t);else toast("No trailer available");return}
 if(d.epw!==undefined){const p=d.epw.split(":"),k=CAT[view].id+"|"+p[0]+"|"+p[1];if(S.eps[k]){delete S.eps[k];queue("unepisode:"+k)}else{S.eps[k]=1;queue("episode:"+k)}save();render();return}
@@ -900,7 +919,7 @@ if(d.back!==undefined){view=null;render();return}
 if(d.save!==undefined){const i=S.watchlist.indexOf(view);if(i>-1)S.watchlist.splice(i,1);else{S.watchlist.push(view);queue("watchlist:"+CAT[view].id)}save();render();toast(i>-1?"Removed from watchlist":"Saved to watchlist");return}
 if(d.mark!==undefined){const id=CAT[view].id;if(isTv(CAT[view])){const k=id+"|"+EP.s+"|"+EP.e;if(S.eps[k]){delete S.eps[k];queue("unepisode:"+k)}else{S.eps[k]=1;queue("episode:"+k)}save();render();toast("Episode updated");return}
 if(S.watched[id]){delete S.watched[id];queue("unwatch:"+id)}else{S.watched[id]=1;delete S.progress[view];queue("history:"+id)}save();render();toast("Updated");return}
-if(d.watch!==undefined&&S.addons.length){playBest(view);return}
+if(d.watch!==undefined&&S.addons.length){window.__binge=0;playBest(view);return}
 if(d.watch!==undefined){toast("Install an addon in Settings to find something to play");return}
 if(d.link){
 if(d.link==="mdb"){const v=$("#mk").value.trim();if(!v){toast("Paste your MDBList API key first");return}S.mdb.key=v;save();render();toast("MDBList linked");return}
