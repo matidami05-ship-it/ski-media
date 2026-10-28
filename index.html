@@ -361,8 +361,8 @@ let Q="";
 function addRecent(q){q=(q||"").trim();if(q.length<2)return;S.recent=[q].concat(S.recent.filter(x=>x.toLowerCase()!==q.toLowerCase())).slice(0,8);save()}
 function recentHtml(){if(!S.recent.length)return"";return `<div style="display:flex;justify-content:space-between;align-items:center"><h2>Recent searches</h2><button class="ref" data-rclear>Clear</button></div><div>${S.recent.map((q,i)=>`<span class="rc"><button data-rq="${i}">${esc(q)}</button><button data-rx="${i}" aria-label="Remove ${esc(q)}">&times;</button></span>`).join("")}</div>`}
 function hits(q){q=q.trim().toLowerCase();if(!q)return[];return CAT.map((m,i)=>i).filter(i=>{const m=CAT[i],x=META[m.id];return[m.t,m.y,x.dir,x.cast.join(" "),x.gen.join(" ")].join(" ").toLowerCase().includes(q)})}
-function results(){const q=Q.trim();if(!q)return `<p class="meta">Search by title, year, director, actor or genre.</p>${recentHtml()}<h2>Browse all</h2><div class="grid">${CAT.map((m,i)=>i).filter(i=>!CAT[i].tid).map(i=>card(i)).join("")}</div>`;
-const h=hits(Q).filter(i=>!CAT[i].tid&&/^addon/.test(CAT[i].id));let out=h.length?`<h2>In your catalog</h2><div class="grid">${h.map(i=>card(i)).join("")}</div>`:"";
+function results(){const q=Q.trim();if(!q)return `<p class="meta">Search by title, year, director, actor or genre.</p>${recentHtml()}`;
+let out="";
 if(0){}else if(TS==="loading")out+=`<p class="meta">Searching your addons...</p>`;
 else if(TS==="error")out+=`<div class="panel" style="margin-top:16px"><h3>Search failed</h3><p>Couldn't search your addons. Check that you're online.</p></div>`;
 else if(TS==="done")out+=TR.length?`<h2>Results</h2><div class="grid">${TR.map(i=>card(i)).join("")}</div>`:`<p class="meta">Nothing matches "${esc(Q)}".</p>`;
@@ -378,7 +378,7 @@ const mf=SMF[a.url]=SMF[a.url]||await Ski.j(a.url+"/manifest.json");
 const cats=(mf.catalogs||[]).filter(c=>pred(a,c)&&((c.extra||[]).some(e=>e.name==="search")||(c.extraSupported||[]).includes("search"))&&!(c.extra||[]).some(e=>e.isRequired&&e.name!=="search")&&!(c.extraRequired||[]).some(n=>n!=="search"));
 await Promise.all(cats.slice(0,4).map(async c=>{try{
 const r=await Promise.race([Ski.j(a.url+"/catalog/"+c.type+"/"+encodeURIComponent(c.id)+"/search="+encodeURIComponent(q)+".json"),new Promise((_,j)=>setTimeout(()=>j(0),7000))]);
-(r.metas||[]).slice(0,20).forEach(m=>{if(!m||!m.id)return;const k=c.type+m.id;if(seen.has(k))return;seen.add(k);out.push({m,t:c.type})})}catch(e){}}))}catch(e){}}));
+(r.metas||[]).slice(0,20).forEach(m=>{if(!m||!m.id||/\b(2160p|1080p|720p|480p|x26[45]|hevc|bluray|web-?rip|web-?dl|hdrip|dvdrip|remux)\b/i.test(m.name||""))return;const k=c.type+m.id;if(seen.has(k))return;seen.add(k);out.push({m,t:c.type})})}catch(e){}}))}catch(e){}}));
 return out}
 function tsearch(q){clearTimeout(st);TR=[];const t=q.trim();if((!S.addons.length&&!S.tmdb.on)||t.length<2){TS="idle";show();return}TS="loading";show();
 st=setTimeout(async()=>{try{const [ad,tm]=await Promise.all([S.addons.length?addonSearch(t).catch(()=>[]):[],S.tmdb.on?fetch(`https://api.themoviedb.org/3/search/multi?query=${encodeURIComponent(t)}&include_adult=false&api_key=${encodeURIComponent(S.tmdb.key)}`).then(r=>r.json()).then(r=>r.results||[]).catch(()=>[]):[]]);
@@ -814,7 +814,10 @@ try{(document.getElementById("scr")||window).scrollTo({top:0,behavior:"smooth"})
 function initials(n){return String(n||"").split(/\s+/).map(w=>w[0]||"").join("").slice(0,2).toUpperCase()}
 function peopleHtml(i){const m=CAT[i],id=m.aid||m.id,t=tm(i)||{},mt=MT[id]||{};let list=[];
 if(t.cast&&t.cast.length)list=t.cast.concat(t.crew||[]);
-else list=(mt.cast||[]).map(n=>({n,ch:"",img:""})).concat((mt.director||[]).map(n=>({n,ch:"Director",img:""})));
+else{const ax=mt.app_extras||{},ph={};(ax.cast||[]).concat(ax.directors||[],ax.writers||[]).forEach(p=>{if(p&&p.name&&p.photo)ph[p.name]=p.photo});
+const cf=(ax.cast||[]).length?ax.cast.map(p=>({n:p.name,ch:p.character||"",img:p.photo||""})):(mt.cast||[]).map(n=>({n,ch:"",img:ph[n]||""}));
+const df=(ax.directors||[]).length?ax.directors.map(p=>({n:p.name,ch:"Director",img:p.photo||""})):(mt.director||[]).map(n=>({n,ch:"Director",img:ph[n]||""}));
+list=cf.concat(df)}
 if(!list.length)return"";
 return'<h2>Cast &amp; Crew</h2><div class="crow">'+list.map(p=>'<div class="cm"><div class="cmi"'+(p.img?' style="background-image:url('+esc(p.img)+')"':'')+'>'+(p.img?'':esc(initials(p.n)))+'</div><b>'+esc(p.n)+'</b><small>'+esc(p.ch||"")+'</small></div>').join("")+'</div>'}
 const PGN=["Sex & Nudity","Violence & Gore","Profanity","Alcohol, Drugs & Smoking","Frightening & Intense Scenes"];
