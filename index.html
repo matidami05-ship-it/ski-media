@@ -350,11 +350,11 @@ function fmtLeft(s){s=Math.max(0,Math.round(s));const m=Math.round(s/60);return 
 const NEWEP={};
 function bestPos(i){const m=CAT[i];let b=null;Object.keys(S.pos).forEach(k=>{const p=S.pos[k];if(p&&p.id===m.id&&p.t>10&&(!b||p.ts>b.ts))b=p});return b}
 function card(i,showBar){const m=CAT[i],bp=(S.progress[i]>0&&!S.watched[m.id])||showBar?bestPos(i):null,ne=NEWEP[m.id];
-return `<button class="card" data-open="${i}"><div class="poster" style="${pbg(i)}">${S.watched[m.id]?'<span class="tick">Watched</span>':ne?'<span class="newep">NEW EP</span>':''}${m.poster?"":`<b>${esc(m.t)}</b>`}</div><div class="ct">${esc(m.t)}</div><div class="meta">${bp&&bp.d>0?(isTv(m)?"S"+bp.s+":E"+bp.e+" \u00b7 ":"")+fmtLeft(bp.d-bp.t)+" left":ne?"S"+ne.s+":E"+ne.e+" is out":m.y}</div>${(showBar||(S.progress[i]>0&&!S.watched[m.id]))?`<div class="bar"><i style="width:${(S.progress[i]||0)*100}%"></i></div>`:''}</button>`}
+return `<button class="card" data-open="${i}"><div class="poster" style="${pbg(i)}">${S.watched[m.id]?'<span class="tick">Watched</span>':ne?'<span class="newep">NEW EP</span>':''}${m.poster?"":`<b>${esc(m.t)}</b>`}</div><div class="ct">${esc(m.t)}</div><div class="meta">${bp&&bp.d>0?(isTv(m)?"S"+bp.s+":E"+bp.e+" \u00b7 ":"")+fmtLeft(bp.d-bp.t)+" left":(showBar&&!bp&&isTv(m)&&S.last[m.id])?"Up next \u00b7 S"+S.last[m.id].s+":E"+S.last[m.id].e:ne?"S"+ne.s+":E"+ne.e+" is out":m.y}</div>${(showBar||(S.progress[i]>0&&!S.watched[m.id]))?`<div class="bar"><i style="width:${(S.progress[i]||0)*100}%"></i></div>`:''}</button>`}
 
 function home(){
 const cont=contList();
-return `<div id="hero"></div>${cont.length?`<h2>Continue watching</h2><div class="row">${cont.map(i=>card(i,true)).join("")}</div>`:''}
+return `<div id="hero"></div><h2>Continue watching</h2>${cont.length?`<div class="row">${cont.map(i=>card(i,true)).join("")}</div>`:'<p class="meta" style="margin:4px 0 16px">Nothing in progress yet. Start a movie or episode and it shows up here so you can pick up where you left off.</p>'}
 <div id="arows"></div>${manage("home")}${S.addons.length?'':'<div class="panel"><h3>Add more catalogs</h3><p>Ski Media loads catalogs and sources from addons you install yourself. Add an addon URL in Settings.</p><button class="btn alt" data-tab="settings">Open settings</button></div>'}`}
 
 let Q="";
@@ -516,7 +516,9 @@ if(ended||(d>0&&t/d>=.93)){delete S.pos[k];delete S.progress[vi];if(tv){S.eps[k]
 else if(t>5){S.pos[k]={t:Math.floor(t),d:Math.floor(d||0),ts:Date.now(),id:m.id,s,e};if(d>0)S.progress[vi]=Math.min(.98,t/d);if(tv)S.last[m.id]={s,e}}
 save()}
 function contList(){const best={};Object.keys(S.pos).forEach(k=>{const p=S.pos[k];if(!p||!p.id||p.t<=10)return;if(!best[p.id]||p.ts>best[p.id].ts)best[p.id]=p});
-return Object.values(best).sort((a,b)=>b.ts-a.ts).map(p=>{const i=CAT.findIndex(m=>m.id===p.id);if(i<0)return null;if(p.d>0)S.progress[i]=Math.min(.98,p.t/p.d);return i}).filter(i=>i!==null)}
+const out=Object.values(best).sort((a,b)=>b.ts-a.ts).map(p=>{const i=CAT.findIndex(m=>m.id===p.id);if(i<0)return null;if(p.d>0)S.progress[i]=Math.min(.98,p.t/p.d);return i}).filter(i=>i!==null);
+Object.keys(S.last||{}).forEach(id=>{const i=CAT.findIndex(m=>m.id===id);if(i<0||out.includes(i)||!isTv(CAT[i]))return;if(Object.keys(S.eps).some(k=>k.indexOf(id+"|")===0))out.push(i)});
+return out}
 async function playAny(url,title,key,live){const pos=(!live&&key&&getPos(key))?getPos(key)*1000:0;
 const done=res=>{if(!res)return;if(res.error)return;if(!live&&key&&res.duration>0){const t=res.position/1000,d=res.duration/1000;if(res.ended||t/d>=.93)delete S.pos[key];else if(t>5)S.pos[key]={t,d,ts:Date.now(),title};save()}};
 if(useSki()){try{const res=await skiP().play({url,title,pos});if(res&&res.error){toast("Ski Player couldn't play this ("+String(res.error).replace(/^ERROR_CODE_/,"").toLowerCase().replace(/_/g," ")+").")}else{done(res);return}}catch(e){toast("Ski Player isn't available. Trying VLC.")}}
