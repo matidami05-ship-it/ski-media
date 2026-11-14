@@ -509,7 +509,8 @@ load("orig",getPos(posKey(m,cur.s,cur.e)));kick();scrobbleVideo(v,m)}
 let LAST={url:"",title:"",vi:-1};
 function skiP(){const C=window.Capacitor;const P=C&&C.Plugins&&C.Plugins.SkiPlayer;return P&&typeof P.play==="function"?P:null}
 function useSki(){return S.player==="ski"&&Ski.native()&&!!skiP()}
-function useVlc(){return S.player!=="app"&&Ski.native()}
+function isAndroid(){const C=window.Capacitor;return !!(C&&C.getPlatform&&C.getPlatform()==="android")}
+function useVlc(){return S.player!=="app"&&Ski.native()&&isAndroid()}
 function fmtT(t){t=Math.max(0,Math.floor(t||0));const h=Math.floor(t/3600),m=Math.floor(t%3600/60),x=t%60;return(h?h+":"+String(m).padStart(2,"0"):m)+":"+String(x).padStart(2,"0")}
 function posKey(m,s,e){return isTv(m)?m.id+"|"+s+"|"+e:m.id+"|0|0"}
 function getPos(k){const p=S.pos[k];return p&&p.t>10?p.t:0}
@@ -910,10 +911,10 @@ return `<h2>Settings</h2><div class="panel"><h3>Backup &amp; transfer</h3><p>Sav
 <label for="cff">Import from a file</label><input id="cff" type="file" accept=".json,application/json,text/plain">
 <label for="cft">Or paste a configuration</label><textarea id="cft" rows="3" placeholder="Paste the configuration text" style="width:100%"></textarea>
 <button class="btn" data-cfimp>Import pasted text</button></div>
-<div class="panel"><h3>App updates</h3><p>${UPD.name?"Version "+esc(UPD.name):"Checks for a newer Ski Media build, downloads it and opens the installer."}</p><p class="meta" id="updst"></p>
+${isAndroid()||!Ski.native()?`<div class="panel"><h3>App updates</h3><p>${UPD.name?"Version "+esc(UPD.name):"Checks for a newer Ski Media build, downloads it and opens the installer."}</p><p class="meta" id="updst"></p>
 <button class="btn" data-updchk>Check for updates</button> <button class="btn" id="updgo" data-updgo ${UPD.rel?"":"hidden"}>Download &amp; install</button>
 <label for="ugt">GitHub token (needed while the repo is private)</label><input id="ugt" type="password" autocomplete="off" value="${esc(S.upd.token||"")}" placeholder="Fine-grained token, Contents: read">
-</div>
+</div>`:""}
 <div class="panel"><h3>Player</h3><p>Where videos open when you tap Play.</p><label for="plr">Player</label><select id="plr"><option value="ski" ${S.player==="ski"?"selected":""}>Ski Player (recommended)</option><option value="vlc" ${S.player==="vlc"?"selected":""}>VLC</option><option value="app" ${S.player==="app"?"selected":""}>Basic web player</option></select><p class="note">Ski Player plays almost every video and audio format (including Dolby and DTS sound), lets you skip and scrub, and remembers where you stopped. If it can't play something, the app falls back to VLC, so VLC is still worth having installed.</p></div>
 <div class="panel"><h3>TV mode</h3><p>Layout for Android TV and other remote-control screens. Auto turns it on when there is no touchscreen.</p><label for="tvm">TV mode</label><select id="tvm"><option value="auto" ${(S.tvmode||"auto")==="auto"?"selected":""}>Auto</option><option value="on" ${S.tvmode==="on"?"selected":""}>On</option><option value="off" ${S.tvmode==="off"?"selected":""}>Off</option></select></div>
 <div class="panel"><h3>TMDB</h3><span class="status ${S.tmdb.on?'on':''}">${S.tmdb.on?'Linked':'Not linked'}</span>
